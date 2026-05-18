@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"aisearch/internal/check"
 	"aisearch/internal/config"
 	"aisearch/internal/router"
 	"aisearch/pkg/logger"
@@ -23,7 +22,7 @@ func main() {
 	log := logger.GetLogger()
 
 	// 启动前检查 MySQL 和 Redis 连接
-	check.PreStartCheck(&cfg)
+	cfg.PreStartCheck()
 
 	r := router.New(cfg)
 	addr := fmt.Sprintf(":%s", cfg.Port)
