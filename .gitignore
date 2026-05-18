@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Log files
+log/
+
 # Go build output
 /bin/
 /dist/

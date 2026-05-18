@@ -5,8 +5,20 @@
 ## 启动项目
 
 ```bash
-go run ./cmd/server
+# 开发环境（默认）
+go run cmd/server/main.go
+
+# 指定环境
+go run cmd/server/main.go dev
+go run cmd/server/main.go prod
 ```
+
+环境配置文件：
+
+| 环境 | 配置文件 | 端口 | 日志级别 |
+|------|---------|------|---------|
+| dev  | .env.dev | 8080 | debug |
+| prod | .env.prod | 8081 | info |
 
 默认服务地址：
 
@@ -79,10 +91,38 @@ pkg/response
 公共响应工具。负责统一 API 返回格式，避免每个 handler 手写重复的 JSON 结构。
 
 ```text
+pkg/logger
+```
+
+日志工具。负责日志初始化和写入，按日期自动分割日志文件（`log/YYYY-MM-DD.log`）。
+
+```text
+log/
+```
+
+日志目录。存放按日期分割的日志文件，如 `log/2026-05-18.log`，已加入 `.gitignore`。
+
+```text
 .env.example
 ```
 
 环境变量示例文件。部署或本地开发时可以按这个文件配置 `APP_NAME`、`APP_ENV`、`APP_PORT`。
+
+## 环境变量
+
+参考 `.env.example` 文件，配置说明：
+
+| 变量 | 说明 | dev 默认值 | prod 默认值 |
+|------|------|-----------|------------|
+| APP_NAME | 应用名称 | aisearch | aisearch |
+| APP_ENV | 环境 | dev | prod |
+| APP_PORT | 服务端口 | 8080 | 8081 |
+| LOG_LEVEL | 日志级别 | debug | info |
+| DB_HOST | 数据库地址 | localhost | prod-db.example.com |
+| DB_PORT | 数据库端口 | 5432 | 5432 |
+| DB_USER | 数据库用户 | dev_user | prod_user |
+| DB_PASSWORD | 数据库密码 | dev_pass | (需设置) |
+| DB_NAME | 数据库名 | aisearch_dev | aisearch |
 
 ## 分层调用关系
 

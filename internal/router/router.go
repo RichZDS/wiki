@@ -1,13 +1,11 @@
 package router
 
 import (
-	"github.com/gin-gonic/gin"
-
 	"aisearch/internal/config"
-	"aisearch/internal/handler"
 	"aisearch/internal/middleware"
-	"aisearch/internal/repository"
-	"aisearch/internal/service"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func New(cfg config.Config) *gin.Engine {
@@ -19,18 +17,12 @@ func New(cfg config.Config) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestLogger())
 
-	healthHandler := handler.NewHealthHandler(cfg)
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"message": "OK"})
+	})
 
-	wikiRepo := repository.NewWikiRepository()
-	wikiService := service.NewWikiService(wikiRepo)
-	wikiHandler := handler.NewWikiHandler(wikiService)
-
-	r.GET("/health", healthHandler.Check)
-
-	api := r.Group("/api/v1")
+	_ = r.Group("/api/v1")
 	{
-		api.GET("/wikis", wikiHandler.List)
-		api.GET("/wikis/:id", wikiHandler.GetByID)
 	}
 
 	return r

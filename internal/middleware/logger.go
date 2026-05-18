@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"log"
 	"time"
 
+	"aisearch/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,7 +12,7 @@ func RequestLogger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 
-		log.Printf(
+		logger.GetLogger().Printf(
 			"%s %s %d %s",
 			c.Request.Method,
 			c.Request.URL.Path,
