@@ -24,11 +24,15 @@ type Config struct {
 }
 
 type DBConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
+	Host            string // 数据库地址
+	Port            string // 数据库端口
+	User            string // 数据库用户名
+	Password        string // 数据库密码
+	DBName          string // 数据库名称
+	MaxIdleConns    int    // 最大空闲连接数
+	MaxOpenConns    int    // 最大打开连接数
+	ConnMaxLifetime int    // 连接最大生命周期（秒）
+	Charset         string // 字符集
 }
 
 type RedisConfig struct {
@@ -57,11 +61,15 @@ var envDefaults = map[string]envConfig{
 		Port:     "8080",
 		LogLevel: "debug",
 		DB: DBConfig{
-			Host:     "localhost",
-			Port:     "3306",
-			User:     "root",
-			Password: "12345678",
-			DBName:   "aisearch_dev",
+			Host:            "localhost",
+			Port:            "3306",
+			User:            "root",
+			Password:        "12345678",
+			DBName:          "aisearch_dev",
+			MaxIdleConns:    10,
+			MaxOpenConns:    100,
+			ConnMaxLifetime: 3600,
+			Charset:         "utf8mb4",
 		},
 		Redis: RedisConfig{
 			Host:     "localhost",
@@ -78,11 +86,15 @@ var envDefaults = map[string]envConfig{
 		Port:     "8081",
 		LogLevel: "info",
 		DB: DBConfig{
-			Host:     "prod-db.example.com",
-			Port:     "3306",
-			User:     "prod_user",
-			Password: "",
-			DBName:   "aisearch",
+			Host:            "prod-db.example.com",
+			Port:            "3306",
+			User:            "prod_user",
+			Password:        "",
+			DBName:          "aisearch",
+			MaxIdleConns:    20,
+			MaxOpenConns:    200,
+			ConnMaxLifetime: 7200,
+			Charset:         "utf8mb4",
 		},
 		Redis: RedisConfig{
 			Host:     "prod-redis.example.com",
@@ -118,11 +130,15 @@ func Load() Config {
 		Port:     getEnv("APP_PORT", defaults.Port),
 		LogLevel: getEnv("LOG_LEVEL", defaults.LogLevel),
 		DB: DBConfig{
-			Host:     getEnv("DB_HOST", defaults.DB.Host),
-			Port:     getEnv("DB_PORT", defaults.DB.Port),
-			User:     getEnv("DB_USER", defaults.DB.User),
-			Password: getEnv("DB_PASSWORD", defaults.DB.Password),
-			DBName:   getEnv("DB_NAME", defaults.DB.DBName),
+			Host:            getEnv("DB_HOST", defaults.DB.Host),
+			Port:            getEnv("DB_PORT", defaults.DB.Port),
+			User:            getEnv("DB_USER", defaults.DB.User),
+			Password:        getEnv("DB_PASSWORD", defaults.DB.Password),
+			DBName:          getEnv("DB_NAME", defaults.DB.DBName),
+			MaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", defaults.DB.MaxIdleConns),
+			MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", defaults.DB.MaxOpenConns),
+			ConnMaxLifetime: getEnvAsInt("DB_CONN_MAX_LIFETIME", defaults.DB.ConnMaxLifetime),
+			Charset:         getEnv("DB_CHARSET", defaults.DB.Charset),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", defaults.Redis.Host),
@@ -142,6 +158,16 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	var result int
+	fmt.Sscanf(value, "%d", &result)
+	return result
 }
 
 // CheckMySQL 检查 MySQL 数据库连接是否正常
