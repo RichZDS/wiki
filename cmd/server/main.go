@@ -22,19 +22,14 @@ func main() {
 	logger.Init(cfg.Env)
 	log := logger.GetLogger()
 
-	// 启动前检查 MySQL 和 Redis 连接
-	cfg.PreStartCheck()
-
-	// 初始化 GORM 数据库连接
+	// 初始化 GORM MySQL（连接失败会 panic）
 	database.InitMySQL(cfg.DB)
 	defer database.Close()
 
 	r := router.New(cfg)
 	addr := fmt.Sprintf(":%s", cfg.Port)
 
-	log.Printf("[%s] server started on http://localhost%s (env=%s, log=%s)",
-		cfg.AppName, addr, cfg.Env, cfg.LogLevel)
-	log.Printf("database: %s:%s/%s", cfg.DB.Host, cfg.DB.Port, cfg.DB.DBName)
+	log.Printf("server started on http://localhost%s (env=%s)", addr, cfg.Env)
 
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("server stopped: %v", err)

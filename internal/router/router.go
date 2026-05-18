@@ -3,7 +3,7 @@ package router
 import (
 	"aisearch/internal/config"
 	"aisearch/internal/middleware"
-	"net/http"
+	"aisearch/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,12 +18,8 @@ func New(cfg config.Config) *gin.Engine {
 	r.Use(middleware.RequestLogger())
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "OK"})
+		response.Success(c, 200, gin.H{"message": "OK"})
 	})
-
-	_ = r.Group("/api/v1")
-	{
-	}
 
 	return r
 }

@@ -1,16 +1,11 @@
 package config
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/redis/go-redis/v9"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 type Config struct {
@@ -170,69 +165,3 @@ func getEnvAsInt(key string, fallback int) int {
 	return result
 }
 
-// CheckMySQL 使用 GORM 检查 MySQL 数据库连接是否正常
-// ctx: 上下文，用于控制超时
-// 返回值: error 如果连接失败
-func (c *Config) CheckMySQL(ctx context.Context) error {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local",
-		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.DBName, c.DB.Charset)
-
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return fmt.Errorf("[MySQL] 创建数据库连接失败: %w", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return fmt.Errorf("[MySQL] 获取底层连接失败: %w", err)
-	}
-	defer sqlDB.Close()
-
-	sqlDB.SetConnMaxLifetime(5 * time.Second)
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if err := sqlDB.PingContext(ctx); err != nil {
-		return fmt.Errorf("[MySQL] 无法连接到数据库 %s:%s, 错误: %w", c.DB.Host, c.DB.Port, err)
-	}
-	return nil
-}
-
-// CheckRedis 检查 Redis 服务器连接是否正常
-// ctx: 上下文，用于控制超时
-// 返回值: error 如果连接失败
-func (c *Config) CheckRedis(ctx context.Context) error {
-	addr := fmt.Sprintf("%s:%s", c.Redis.Host, c.Redis.Port)
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: c.Redis.Password,
-		DB:       0,
-	})
-	defer rdb.Close()
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		return fmt.Errorf("[Redis] 无法连接到 Redis %s, 错误: %w", addr, err)
-	}
-	return nil
-}
-
-// PreStartCheck 程序启动前的依赖检查
-// 会依次检查 MySQL 和 Redis 连接
-// 如果任何一项检查失败，程序会 panic 并退出
-func (c *Config) PreStartCheck() {
-	ctx := context.Background()
-
-	if err := c.CheckMySQL(ctx); err != nil {
-		panic(fmt.Sprintf("【启动检查失败】MySQL 数据库连接不可用: %v\n程序无法启动，请检查数据库配置和网络连接。", err))
-	}
-
-	if err := c.CheckRedis(ctx); err != nil {
-		panic(fmt.Sprintf("【启动检查失败】Redis 缓存连接不可用: %v\n程序无法启动，请检查 Redis 配置和网络连接。", err))
-	}
-}
