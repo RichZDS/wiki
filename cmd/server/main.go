@@ -6,6 +6,7 @@ import (
 
 	"aisearch/internal/config"
 	"aisearch/internal/router"
+	"aisearch/pkg/database"
 	"aisearch/pkg/logger"
 )
 
@@ -23,6 +24,10 @@ func main() {
 
 	// 启动前检查 MySQL 和 Redis 连接
 	cfg.PreStartCheck()
+
+	// 初始化 GORM 数据库连接
+	database.InitMySQL(cfg.DB)
+	defer database.Close()
 
 	r := router.New(cfg)
 	addr := fmt.Sprintf(":%s", cfg.Port)

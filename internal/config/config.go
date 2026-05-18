@@ -2,15 +2,15 @@ package config
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 type Config struct {
@@ -170,27 +170,32 @@ func getEnvAsInt(key string, fallback int) int {
 	return result
 }
 
-// CheckMySQL 检查 MySQL 数据库连接是否正常
+// CheckMySQL 使用 GORM 检查 MySQL 数据库连接是否正常
 // ctx: 上下文，用于控制超时
 // 返回值: error 如果连接失败
 func (c *Config) CheckMySQL(ctx context.Context) error {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.DBName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local",
+		c.DB.User, c.DB.Password, c.DB.Host, c.DB.Port, c.DB.DBName, c.DB.Charset)
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("[MySQL] 创建数据库连接失败: %w", err)
 	}
-	defer db.Close()
 
-	db.SetConnMaxLifetime(5 * time.Second)
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
+	sqlDB, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("[MySQL] 获取底层连接失败: %w", err)
+	}
+	defer sqlDB.Close()
+
+	sqlDB.SetConnMaxLifetime(5 * time.Second)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := sqlDB.PingContext(ctx); err != nil {
 		return fmt.Errorf("[MySQL] 无法连接到数据库 %s:%s, 错误: %w", c.DB.Host, c.DB.Port, err)
 	}
 	return nil
