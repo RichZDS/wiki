@@ -1,0 +1,23 @@
+server:
+  port: 8080
+  app_name: aisearch
+
+log:
+  level: debug
+
+mysql:
+  host: localhost
+  port: 3306
+  user: root
+  password: "12345678"
+  database: aisearch_dev
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
