@@ -1,167 +1,137 @@
 package config
 
 import (
-	"fmt"
-	"log"
 	"os"
 
-	"github.com/joho/godotenv"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	AppName  string
-	Env      string
-	Port     string
-	LogLevel string
-	DB       DBConfig
-	Redis    RedisConfig
-	DateTime DateTimeConfig
+	Server   ServerConfig   `yaml:"server"`
+	Log      LogConfig      `yaml:"log"`
+	MySQL    MySQLConfig    `yaml:"mysql"`
+	Redis    RedisConfig    `yaml:"redis"`
+	Env      string         `yaml:"-"`
 }
 
-type DBConfig struct {
-	Host            string // 数据库地址
-	Port            string // 数据库端口
-	User            string // 数据库用户名
-	Password        string // 数据库密码
-	DBName          string // 数据库名称
-	MaxIdleConns    int    // 最大空闲连接数
-	MaxOpenConns    int    // 最大打开连接数
-	ConnMaxLifetime int    // 连接最大生命周期（秒）
-	Charset         string // 字符集
+type ServerConfig struct {
+	Port    string `yaml:"port"`
+	AppName string `yaml:"app_name"`
+}
+
+type LogConfig struct {
+	Level string `yaml:"level"`
+}
+
+type MySQLConfig struct {
+	Host            string `yaml:"host"`
+	Port            string `yaml:"port"`
+	User            string `yaml:"user"`
+	Password        string `yaml:"password"`
+	Database        string `yaml:"database"`
+	Charset         string `yaml:"charset"`
+	MaxIdleConns    int    `yaml:"max_idle_conns"`
+	MaxOpenConns    int    `yaml:"max_open_conns"`
+	ConnMaxLifetime int    `yaml:"conn_max_lifetime"`
 }
 
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Password string
-	DB       string
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
-type DateTimeConfig struct {
-	TimeZone string
-}
-
-type envConfig struct {
-	AppName  string
-	Port     string
-	LogLevel string
-	DB       DBConfig
-	Redis    RedisConfig
-	DateTime DateTimeConfig
-}
-
-var envDefaults = map[string]envConfig{
-	"dev": {
-		AppName:  "aisearch",
-		Port:     "8080",
-		LogLevel: "debug",
-		DB: DBConfig{
-			Host:            "localhost",
-			Port:            "3306",
-			User:            "root",
-			Password:        "12345678",
-			DBName:          "aisearch_dev",
-			MaxIdleConns:    10,
-			MaxOpenConns:    100,
-			ConnMaxLifetime: 3600,
-			Charset:         "utf8mb4",
-		},
-		Redis: RedisConfig{
-			Host:     "localhost",
-			Port:     "6379",
-			Password: "",
-			DB:       "0",
-		},
-		DateTime: DateTimeConfig{
-			TimeZone: "Asia/Shanghai",
-		},
-	},
-	"prod": {
-		AppName:  "aisearch",
-		Port:     "8081",
-		LogLevel: "info",
-		DB: DBConfig{
-			Host:            "prod-db.example.com",
-			Port:            "3306",
-			User:            "prod_user",
-			Password:        "",
-			DBName:          "aisearch",
-			MaxIdleConns:    20,
-			MaxOpenConns:    200,
-			ConnMaxLifetime: 7200,
-			Charset:         "utf8mb4",
-		},
-		Redis: RedisConfig{
-			Host:     "prod-redis.example.com",
-			Port:     "6379",
-			Password: "",
-			DB:       "0",
-		},
-		DateTime: DateTimeConfig{
-			TimeZone: "UTC",
-		},
-	},
-}
-
-func LoadEnvFile() {
+func Load() Config {
 	env := os.Getenv("APP_ENV")
 	if env == "" {
 		env = "dev"
 	}
 
-	envFile := ".env." + env
-	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("warning: %s not found, using environment variables", envFile)
+	cfg := mustLoadYAML("config.yaml")
+
+	if env == "prod" {
+		override := mustLoadYAML("config.prod.yaml")
+		cfg = merge(cfg, override)
 	}
+
+	cfg.Env = env
+
+	// 敏感字段允许环境变量覆盖
+	if pw := os.Getenv("MYSQL_PASSWORD"); pw != "" {
+		cfg.MySQL.Password = pw
+	}
+	if pw := os.Getenv("REDIS_PASSWORD"); pw != "" {
+		cfg.Redis.Password = pw
+	}
+
+	return cfg
 }
 
-func Load() Config {
-	env := getEnv("APP_ENV", "dev")
-	defaults := envDefaults[env]
-
-	return Config{
-		AppName:  getEnv("APP_NAME", defaults.AppName),
-		Env:      env,
-		Port:     getEnv("APP_PORT", defaults.Port),
-		LogLevel: getEnv("LOG_LEVEL", defaults.LogLevel),
-		DB: DBConfig{
-			Host:            getEnv("DB_HOST", defaults.DB.Host),
-			Port:            getEnv("DB_PORT", defaults.DB.Port),
-			User:            getEnv("DB_USER", defaults.DB.User),
-			Password:        getEnv("DB_PASSWORD", defaults.DB.Password),
-			DBName:          getEnv("DB_NAME", defaults.DB.DBName),
-			MaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", defaults.DB.MaxIdleConns),
-			MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", defaults.DB.MaxOpenConns),
-			ConnMaxLifetime: getEnvAsInt("DB_CONN_MAX_LIFETIME", defaults.DB.ConnMaxLifetime),
-			Charset:         getEnv("DB_CHARSET", defaults.DB.Charset),
-		},
-		Redis: RedisConfig{
-			Host:     getEnv("REDIS_HOST", defaults.Redis.Host),
-			Port:     getEnv("REDIS_PORT", defaults.Redis.Port),
-			Password: getEnv("REDIS_PASSWORD", defaults.Redis.Password),
-			DB:       getEnv("REDIS_DB", defaults.Redis.DB),
-		},
-		DateTime: DateTimeConfig{
-			TimeZone: getEnv("TIME_ZONE", defaults.DateTime.TimeZone),
-		},
+func mustLoadYAML(path string) Config {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		panic("无法读取配置文件 " + path + ": " + err.Error())
 	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		panic("解析配置文件 " + path + " 失败: " + err.Error())
+	}
+	return cfg
 }
 
-func getEnv(key, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
+func merge(base, override Config) Config {
+	if override.Server.Port != "" {
+		base.Server.Port = override.Server.Port
 	}
-	return value
-}
-
-func getEnvAsInt(key string, fallback int) int {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
+	if override.Server.AppName != "" {
+		base.Server.AppName = override.Server.AppName
 	}
-	var result int
-	fmt.Sscanf(value, "%d", &result)
-	return result
-}
+	if override.Log.Level != "" {
+		base.Log.Level = override.Log.Level
+	}
 
+	if override.MySQL.Host != "" {
+		base.MySQL.Host = override.MySQL.Host
+	}
+	if override.MySQL.Port != "" {
+		base.MySQL.Port = override.MySQL.Port
+	}
+	if override.MySQL.User != "" {
+		base.MySQL.User = override.MySQL.User
+	}
+	if override.MySQL.Password != "" {
+		base.MySQL.Password = override.MySQL.Password
+	}
+	if override.MySQL.Database != "" {
+		base.MySQL.Database = override.MySQL.Database
+	}
+	if override.MySQL.Charset != "" {
+		base.MySQL.Charset = override.MySQL.Charset
+	}
+	if override.MySQL.MaxIdleConns != 0 {
+		base.MySQL.MaxIdleConns = override.MySQL.MaxIdleConns
+	}
+	if override.MySQL.MaxOpenConns != 0 {
+		base.MySQL.MaxOpenConns = override.MySQL.MaxOpenConns
+	}
+	if override.MySQL.ConnMaxLifetime != 0 {
+		base.MySQL.ConnMaxLifetime = override.MySQL.ConnMaxLifetime
+	}
+
+	if override.Redis.Host != "" {
+		base.Redis.Host = override.Redis.Host
+	}
+	if override.Redis.Port != "" {
+		base.Redis.Port = override.Redis.Port
+	}
+	if override.Redis.Password != "" {
+		base.Redis.Password = override.Redis.Password
+	}
+	if override.Redis.DB != 0 {
+		base.Redis.DB = override.Redis.DB
+	}
+
+	return base
+}

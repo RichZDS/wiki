@@ -14,11 +14,9 @@ import (
 
 var DB *gorm.DB
 
-// InitMySQL 使用 GORM 初始化 MySQL，连接失败会 panic。
-// cfg: 数据库连接池配置
-func InitMySQL(cfg config.DBConfig) {
+func InitMySQL(cfg config.MySQLConfig) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local",
-		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DBName, cfg.Charset)
+		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, cfg.Charset)
 
 	var err error
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
@@ -38,10 +36,9 @@ func InitMySQL(cfg config.DBConfig) {
 	sqlDB.SetConnMaxLifetime(time.Duration(cfg.ConnMaxLifetime) * time.Second)
 
 	logger.GetLogger().Printf("MySQL 连接成功 %s:%s/%s (max_open=%d max_idle=%d)",
-		cfg.Host, cfg.Port, cfg.DBName, cfg.MaxOpenConns, cfg.MaxIdleConns)
+		cfg.Host, cfg.Port, cfg.Database, cfg.MaxOpenConns, cfg.MaxIdleConns)
 }
 
-// Close 关闭数据库连接。
 func Close() {
 	if DB != nil {
 		sqlDB, _ := DB.DB()
