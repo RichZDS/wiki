@@ -7,9 +7,10 @@
 //
 // 调用方通过 NewChunker(strategy) 获取对应的 Chunker 实现：
 //
-//	free := embedding.NewChunker(embedding.StrategyFree)   // 递归字符分割
-//	md   := embedding.NewChunker(embedding.StrategyMD)     // Markdown 标题分割
-//	eino := embedding.NewChunker(embedding.StrategyEino)   // 语义向量分割
+//	free  := embedding.NewChunker(embedding.StrategyFree)         // 递归字符分割
+//	md    := embedding.NewChunker(embedding.StrategyMD)           // 元素分类+标题聚合
+//	eino  := embedding.NewChunker(embedding.StrategyEino)         // 语义向量分割
+//	hier  := embedding.NewChunker(embedding.StrategyHierarchical) // 上下文感知分层切分
 //
 // 返回类型 []*schema.Document 可直接对接 Eino 的 Indexer.Store。
 package embedding
@@ -31,6 +32,8 @@ const (
 	StrategyMD Strategy = "md"
 	// StrategyEino 语义切块 — 通过 Eino EmbeddingModel 在低相似度边界处切分。
 	StrategyEino Strategy = "eino"
+	// StrategyHierarchical 上下文感知分层切块 — 两层父子结构，小子块精确检索，大父块提供上下文。
+	StrategyHierarchical Strategy = "hierarchical"
 )
 
 // ChunkConfig 切块参数，由调用方根据文档类型和下游模型窗口大小进行调参。
@@ -77,6 +80,8 @@ func NewChunker(strategy Strategy) Chunker {
 		return &mdChunker{}
 	case StrategyEino:
 		return &einoChunker{}
+	case StrategyHierarchical:
+		return &hierarchicalChunker{mdChunker: &mdChunker{}}
 	default:
 		return &freeChunker{}
 	}
@@ -84,8 +89,15 @@ func NewChunker(strategy Strategy) Chunker {
 
 // 写入 schema.Document.MetaData 时使用的键名。
 const (
-	metaKeyChunkIndex  = "chunk_index"  // 当前块序号，0-based
-	metaKeyTotalChunks = "chunk_total"  // 该文档被切分的总块数
+	metaKeyChunkIndex    = "chunk_index"    // 当前块序号，0-based
+	metaKeyTotalChunks   = "chunk_total"    // 该文档被切分的总块数
+	metaKeyHeadingPath   = "heading_path"   // 标题路径，如 "Chapter 1 > Section 1.1"
+	metaKeyElementTypes  = "element_types"  // 块内包含的元素类型列表
+	metaKeyChunkStrategy = "chunk_strategy" // 生成该块的策略名
+	metaKeyChunkRole     = "chunk_role"     // 分层切块中的角色: "parent" / "child"
+	metaKeyParentContent = "parent_content" // 父块完整文本（子块用）
+	metaKeyParentChunkID = "parent_chunk_id" // 父块 ID（子块用）
+	metaKeyChildChunkIDs = "child_chunk_ids" // 子块 ID 列表（父块用）
 )
 
 // newDocument 构造一个带完整元数据的 Document 切片。
@@ -98,5 +110,18 @@ func newDocument(content string, index, total int) *schema.Document {
 			metaKeyChunkIndex:  index,
 			metaKeyTotalChunks: total,
 		},
+	}
+}
+
+// sanitizeConfig 统一参数兜底，避免各 chunker 重复边界检查。
+func sanitizeConfig(cfg *ChunkConfig) {
+	if cfg.ChunkSize <= 0 {
+		cfg.ChunkSize = 500
+	}
+	if cfg.ChunkOverlap >= cfg.ChunkSize {
+		cfg.ChunkOverlap = cfg.ChunkSize - 1
+	}
+	if cfg.ChunkOverlap < 0 {
+		cfg.ChunkOverlap = 0
 	}
 }

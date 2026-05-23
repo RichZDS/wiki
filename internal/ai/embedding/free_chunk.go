@@ -22,6 +22,10 @@ type freeChunker struct{}
 // 默认分隔符优先级列表。末尾 "" 表示逐字符拆分——任何文本都能被切分。
 var defaultSeparators = []string{"\n\n", "\n", "。", ".", "，", ",", " ", ""}
 
+func NewFreeChunker() *freeChunker {
+	return &freeChunker{}
+}
+
 // Chunk 执行自由切块。
 // 空内容直接返回 (nil, nil)；单块内容直接返回一个 Document。
 func (c *freeChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
@@ -30,12 +34,7 @@ func (c *freeChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig
 	if len(seps) == 0 {
 		seps = defaultSeparators
 	}
-	if cfg.ChunkSize <= 0 {
-		cfg.ChunkSize = 500
-	}
-	if cfg.ChunkOverlap >= cfg.ChunkSize {
-		cfg.ChunkOverlap = cfg.ChunkSize - 1 // 重叠不能超过块大小
-	}
+	sanitizeConfig(&cfg)
 
 	if len(content) == 0 {
 		return nil, nil
@@ -59,6 +58,7 @@ func (c *freeChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig
 }
 
 // splitText 递归分割入口：找到合适分隔符 → 递归处理超长段 → 合并段为最终块。
+// separators: 分隔符优先级列表 chunkSize: 每块最大字符数 overlap: 块间重叠字符数
 func splitText(text string, separators []string, chunkSize, overlap int) []string {
 	// --- 第一步：找到能切出全部 ≤ chunkSize 片段的分隔符 ---
 	var goodSep string      // 最终选定的分隔符
