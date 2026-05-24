@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"aisearch/internal/ai/embedding"
+	"aisearch/internal/ai/chunk"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -94,8 +94,8 @@ Go 语言以其简洁的语法、强大的并发模型、高效的编译速度�
 
 // TestFreeChunkerShort 测试短文本切块
 func TestFreeChunkerShort(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	cfg := embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	cfg := chunk.ChunkConfig{
 		ChunkSize:    200,
 		ChunkOverlap: 30,
 	}
@@ -120,8 +120,8 @@ func TestFreeChunkerShort(t *testing.T) {
 
 // TestFreeChunkerMedium 测试中等文本切块
 func TestFreeChunkerMedium(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	cfg := embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	cfg := chunk.ChunkConfig{
 		ChunkSize:    200,
 		ChunkOverlap: 30,
 	}
@@ -152,8 +152,8 @@ func TestFreeChunkerMedium(t *testing.T) {
 
 // TestFreeChunkerLong 测试超长文本切块 + overlap 验证
 func TestFreeChunkerLong(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	cfg := embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	cfg := chunk.ChunkConfig{
 		ChunkSize:    250,
 		ChunkOverlap: 40,
 	}
@@ -192,8 +192,8 @@ func TestFreeChunkerLong(t *testing.T) {
 }
 
 func TestFreeChunkerEmpty(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	docs, err := chunker.Chunk(context.Background(), "", embedding.ChunkConfig{ChunkSize: 100})
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{ChunkSize: 100})
 	if err != nil {
 		t.Fatalf("Chunk empty string failed: %v", err)
 	}
@@ -204,8 +204,8 @@ func TestFreeChunkerEmpty(t *testing.T) {
 }
 
 func TestFreeChunkerMetadata(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	docs, err := chunker.Chunk(context.Background(), "Hello World. This is a test.", embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	docs, err := chunker.Chunk(context.Background(), "Hello World. This is a test.", chunk.ChunkConfig{
 		ChunkSize:    100,
 		ChunkOverlap: 0,
 	})

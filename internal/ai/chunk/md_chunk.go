@@ -1,4 +1,4 @@
-package embedding
+package chunk
 
 import (
 	"context"
@@ -381,5 +381,5 @@ func rawSegment(source []byte, n ast.Node) string {
 	}
 	first := lines.At(0)
 	last := lines.At(lines.Len() - 1)
-	return string(source[first.Start : last.Stop])
+	return string(source[first.Start:last.Stop])
 }

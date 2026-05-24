@@ -1,4 +1,4 @@
-package embedding
+package chunk
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"aisearch/internal/ai/chunk"
 	"aisearch/internal/ai/embedding"
 
 	tests "aisearch/tests"
@@ -14,7 +15,7 @@ import (
 // --- 共享测试数据 ---
 
 var (
-	shortMD = "# Title\nSome content here."
+	shortMD  = "# Title\nSome content here."
 	mediumMD = `# Chapter 1
 
 This is the first chapter. It contains some introductory text.
@@ -36,11 +37,11 @@ The second chapter begins with an overview of the architecture.`
 	longMD = strings.Repeat(mediumMD+"\n", 5)
 )
 
-// --- FreeChunker (保持原有测试) ---
+// --- FreeChunker ---
 
 func TestFreeChunker(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	cfg := embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	cfg := chunk.ChunkConfig{
 		ChunkSize:    100,
 		ChunkOverlap: 20,
 		Separators:   []string{"\n\n", "\n", "。", ".", " "},
@@ -62,19 +63,19 @@ func TestFreeChunker(t *testing.T) {
 }
 
 func TestFreeChunkerEmpty(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyFree)
-	docs, err := chunker.Chunk(context.Background(), "", embedding.ChunkConfig{})
+	chunker := chunk.NewChunker(chunk.StrategyFree)
+	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
 	tests.AssertNoErr(t, err, "FreeChunker empty")
 	if docs != nil {
 		t.Error("expected nil for empty input")
 	}
 }
 
-// --- mdChunker (方案三) ---
+// --- mdChunker ---
 
 func TestMDChunker(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyMD)
-	cfg := embedding.ChunkConfig{
+	chunker := chunk.NewChunker(chunk.StrategyMD)
+	cfg := chunk.ChunkConfig{
 		ChunkSize:    500,
 		ChunkOverlap: 50,
 	}
@@ -88,11 +89,9 @@ func TestMDChunker(t *testing.T) {
 	}
 
 	for _, d := range docs {
-		// 验证基本元数据
 		if d.MetaData["chunk_index"] == nil {
 			t.Errorf("chunk %s: missing chunk_index", d.ID)
 		}
-		// 验证策略标记
 		if d.MetaData["chunk_strategy"] != "md" {
 			t.Errorf("chunk %s: expected chunk_strategy=md, got %v", d.ID, d.MetaData["chunk_strategy"])
 		}
@@ -101,9 +100,9 @@ func TestMDChunker(t *testing.T) {
 }
 
 func TestMDChunkerHeadingPath(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyMD)
+	chunker := chunk.NewChunker(chunk.StrategyMD)
 	content := "# Chapter 1\n## Section 1.1\nSome paragraph text under section 1.1.\n## Section 1.2\nMore text here."
-	cfg := embedding.ChunkConfig{ChunkSize: 500, ChunkOverlap: 50}
+	cfg := chunk.ChunkConfig{ChunkSize: 500, ChunkOverlap: 50}
 	docs, err := chunker.Chunk(context.Background(), content, cfg)
 	tests.AssertNoErr(t, err, "MDChunker heading path")
 
@@ -120,13 +119,12 @@ func TestMDChunkerHeadingPath(t *testing.T) {
 }
 
 func TestMDChunkerCodeBlockIntegrity(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyMD)
+	chunker := chunk.NewChunker(chunk.StrategyMD)
 	content := "# Overview\nSome intro.\n\n```go\npackage main\n\nfunc main() {\n\tfmt.Println(\"hello world\")\n}\n```\n\nAfter the code block."
-	cfg := embedding.ChunkConfig{ChunkSize: 100, ChunkOverlap: 20}
+	cfg := chunk.ChunkConfig{ChunkSize: 100, ChunkOverlap: 20}
 	docs, err := chunker.Chunk(context.Background(), content, cfg)
 	tests.AssertNoErr(t, err, "MDChunker code block integrity")
 
-	// Small chunk size should cause splits, but code block text should be present
 	fullText := ""
 	for _, d := range docs {
 		fullText += d.Content
@@ -141,8 +139,8 @@ func TestMDChunkerCodeBlockIntegrity(t *testing.T) {
 }
 
 func TestMDChunkerEmpty(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyMD)
-	docs, err := chunker.Chunk(context.Background(), "", embedding.ChunkConfig{})
+	chunker := chunk.NewChunker(chunk.StrategyMD)
+	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
 	tests.AssertNoErr(t, err, "MDChunker empty")
 	if docs != nil {
 		t.Error("expected nil for empty input")
@@ -150,15 +148,15 @@ func TestMDChunkerEmpty(t *testing.T) {
 }
 
 func TestMDChunkerShortContent(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyMD)
-	docs, err := chunker.Chunk(context.Background(), shortMD, embedding.ChunkConfig{ChunkSize: 500})
+	chunker := chunk.NewChunker(chunk.StrategyMD)
+	docs, err := chunker.Chunk(context.Background(), shortMD, chunk.ChunkConfig{ChunkSize: 500})
 	tests.AssertNoErr(t, err, "MDChunker short content")
 	if len(docs) != 1 {
 		t.Errorf("expected 1 chunk for short content, got %d", len(docs))
 	}
 }
 
-// --- einoChunker (方案四) ---
+// --- einoChunker ---
 
 type mockEmbedder struct {
 	vectors [][]float64
@@ -168,7 +166,6 @@ func (m *mockEmbedder) EmbedStrings(ctx context.Context, texts []string) ([][]fl
 	if m.vectors != nil {
 		return m.vectors, nil
 	}
-	// 生成确定性的简单向量：用文本长度构造 3 维向量，相邻文本会有相似值
 	result := make([][]float64, len(texts))
 	for i, t := range texts {
 		v := make([]float64, 3)
@@ -181,8 +178,8 @@ func (m *mockEmbedder) EmbedStrings(ctx context.Context, texts []string) ([][]fl
 }
 
 func TestEinoChunkerNilEmbedder(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyEino)
-	_, err := chunker.Chunk(context.Background(), "test", embedding.ChunkConfig{})
+	chunker := chunk.NewChunker(chunk.StrategyEino)
+	_, err := chunker.Chunk(context.Background(), "test", chunk.ChunkConfig{})
 	if err == nil {
 		t.Error("expected error for nil embedder")
 	}
@@ -191,10 +188,9 @@ func TestEinoChunkerNilEmbedder(t *testing.T) {
 
 func TestEinoChunkerWithMock(t *testing.T) {
 	mock := &mockEmbedder{}
-	chunker := embedding.NewEinoChunker(mock)
-	cfg := embedding.ChunkConfig{ChunkSize: 500, ChunkOverlap: 30}
+	chunker := chunk.NewEinoChunker(mock)
+	cfg := chunk.ChunkConfig{ChunkSize: 500, ChunkOverlap: 30}
 
-	// 构造多句文本，让 mock embedder 产生不同向量
 	sentences := make([]string, 20)
 	for i := range sentences {
 		sentences[i] = fmt.Sprintf("This is sentence number %d in the document.", i)
@@ -217,8 +213,8 @@ func TestEinoChunkerWithMock(t *testing.T) {
 
 func TestEinoChunkerShortContent(t *testing.T) {
 	mock := &mockEmbedder{}
-	chunker := embedding.NewEinoChunker(mock)
-	docs, err := chunker.Chunk(context.Background(), "short text", embedding.ChunkConfig{ChunkSize: 500})
+	chunker := chunk.NewEinoChunker(mock)
+	docs, err := chunker.Chunk(context.Background(), "short text", chunk.ChunkConfig{ChunkSize: 500})
 	tests.AssertNoErr(t, err, "EinoChunker short content")
 	if len(docs) != 1 {
 		t.Errorf("expected 1 chunk for short content, got %d", len(docs))
@@ -227,8 +223,8 @@ func TestEinoChunkerShortContent(t *testing.T) {
 
 func TestEinoChunkerEmpty(t *testing.T) {
 	mock := &mockEmbedder{}
-	chunker := embedding.NewEinoChunker(mock)
-	docs, err := chunker.Chunk(context.Background(), "", embedding.ChunkConfig{})
+	chunker := chunk.NewEinoChunker(mock)
+	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
 	tests.AssertNoErr(t, err, "EinoChunker empty")
 	if docs != nil {
 		t.Error("expected nil for empty input")
@@ -236,20 +232,19 @@ func TestEinoChunkerEmpty(t *testing.T) {
 }
 
 func TestSplitSentences(t *testing.T) {
-	// 通过 EinoChunker 间接测试分句逻辑
 	mock := &mockEmbedder{
 		vectors: [][]float64{
 			{1.0, 0.0, 0.0},
 			{1.0, 0.1, 0.0},
-			{0.0, 1.0, 0.0}, // 差异大 → 断点
+			{0.0, 1.0, 0.0},
 			{0.0, 1.0, 0.1},
-			{1.0, 0.0, 0.0}, // 差异大 → 断点
+			{1.0, 0.0, 0.0},
 			{1.0, 0.1, 0.0},
 		},
 	}
-	chunker := embedding.NewEinoChunker(mock)
+	chunker := chunk.NewEinoChunker(mock)
 	content := "First sentence. Second sentence. Third topic here. Fourth follows third. Fifth different topic. Sixth close to fifth."
-	docs, err := chunker.Chunk(context.Background(), content, embedding.ChunkConfig{ChunkSize: 200, ChunkOverlap: 0})
+	docs, err := chunker.Chunk(context.Background(), content, chunk.ChunkConfig{ChunkSize: 200, ChunkOverlap: 0})
 	tests.AssertNoErr(t, err, "split sentences")
 	t.Logf("split into %d chunks", len(docs))
 	if len(docs) < 2 {
@@ -257,11 +252,11 @@ func TestSplitSentences(t *testing.T) {
 	}
 }
 
-// --- hierarchicalChunker (方案五) ---
+// --- hierarchicalChunker ---
 
 func TestHierarchicalChunker(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyHierarchical)
-	cfg := embedding.ChunkConfig{ChunkSize: 100, ChunkOverlap: 20}
+	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
+	cfg := chunk.ChunkConfig{ChunkSize: 100, ChunkOverlap: 20}
 
 	docs, err := chunker.Chunk(context.Background(), mediumMD, cfg)
 	tests.AssertNoErr(t, err, "HierarchicalChunker.Chunk")
@@ -297,13 +292,12 @@ func TestHierarchicalChunker(t *testing.T) {
 }
 
 func TestHierarchicalChunkerParentChildLink(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyHierarchical)
-	cfg := embedding.ChunkConfig{ChunkSize: 100, ChunkOverlap: 0}
+	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
+	cfg := chunk.ChunkConfig{ChunkSize: 100, ChunkOverlap: 0}
 
 	docs, err := chunker.Chunk(context.Background(), mediumMD, cfg)
 	tests.AssertNoErr(t, err, "HierarchicalChunker parent-child link")
 
-	// 构建 parent_id → child_ids 的索引
 	parentChildren := make(map[string][]string)
 	childParents := make(map[string]string)
 
@@ -324,14 +318,12 @@ func TestHierarchicalChunkerParentChildLink(t *testing.T) {
 		}
 	}
 
-	// 验证每个子块的 parent_chunk_id 指向一个存在的父块
 	for childID, pid := range childParents {
 		if _, exists := parentChildren[pid]; !exists {
 			t.Errorf("child %s references non-existent parent %s", childID, pid)
 		}
 	}
 
-	// 验证每个父块的 child_chunk_ids 都指向存在的子块
 	childIDs := make(map[string]bool)
 	for _, d := range docs {
 		if role, _ := d.MetaData["chunk_role"].(string); role == "child" {
@@ -350,8 +342,8 @@ func TestHierarchicalChunkerParentChildLink(t *testing.T) {
 }
 
 func TestHierarchicalChunkerEmpty(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyHierarchical)
-	docs, err := chunker.Chunk(context.Background(), "", embedding.ChunkConfig{})
+	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
+	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
 	tests.AssertNoErr(t, err, "HierarchicalChunker empty")
 	if docs != nil {
 		t.Error("expected nil for empty input")
@@ -359,8 +351,8 @@ func TestHierarchicalChunkerEmpty(t *testing.T) {
 }
 
 func TestHierarchicalChunkerShortContent(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyHierarchical)
-	docs, err := chunker.Chunk(context.Background(), shortMD, embedding.ChunkConfig{ChunkSize: 500})
+	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
+	docs, err := chunker.Chunk(context.Background(), shortMD, chunk.ChunkConfig{ChunkSize: 500})
 	tests.AssertNoErr(t, err, "HierarchicalChunker short content")
 	if len(docs) != 1 {
 		t.Errorf("expected 1 chunk for short content, got %d", len(docs))
@@ -372,9 +364,8 @@ func TestHierarchicalChunkerShortContent(t *testing.T) {
 }
 
 func TestHierarchicalChunkerChunkSizeRatio(t *testing.T) {
-	chunker := embedding.NewChunker(embedding.StrategyHierarchical)
-	// 使用足够大的文本确保生成多个层级
-	cfg := embedding.ChunkConfig{ChunkSize: 150, ChunkOverlap: 0}
+	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
+	cfg := chunk.ChunkConfig{ChunkSize: 150, ChunkOverlap: 0}
 
 	docs, err := chunker.Chunk(context.Background(), longMD, cfg)
 	tests.AssertNoErr(t, err, "HierarchicalChunker size ratio")
@@ -404,19 +395,21 @@ func TestHierarchicalChunkerChunkSizeRatio(t *testing.T) {
 // --- 策略分发 ---
 
 func TestNewChunkerStrategy(t *testing.T) {
-	free := embedding.NewChunker(embedding.StrategyFree)
+	free := chunk.NewChunker(chunk.StrategyFree)
 	tests.AssertTrue(t, free != nil, "StrategyFree should return non-nil Chunker")
 
-	md := embedding.NewChunker(embedding.StrategyMD)
+	md := chunk.NewChunker(chunk.StrategyMD)
 	tests.AssertTrue(t, md != nil, "StrategyMD should return non-nil Chunker")
 
-	eino := embedding.NewChunker(embedding.StrategyEino)
+	eino := chunk.NewChunker(chunk.StrategyEino)
 	tests.AssertTrue(t, eino != nil, "StrategyEino should return non-nil Chunker")
 
-	hier := embedding.NewChunker(embedding.StrategyHierarchical)
+	hier := chunk.NewChunker(chunk.StrategyHierarchical)
 	tests.AssertTrue(t, hier != nil, "StrategyHierarchical should return non-nil Chunker")
 
-	// Unknown strategy defaults to free
-	def := embedding.NewChunker("unknown")
+	def := chunk.NewChunker("unknown")
 	tests.AssertTrue(t, def != nil, "unknown strategy should return non-nil Chunker")
 }
+
+// Ensure mockEmbedder implements embedding.Embedder
+var _ embedding.Embedder = (*mockEmbedder)(nil)

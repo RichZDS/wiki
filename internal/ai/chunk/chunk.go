@@ -1,4 +1,4 @@
-// Package embedding 提供文档切块与向量化能力，是 RAG 流水线中 Transformer 角色的实现。
+// Package chunk 提供文档切块能力，是 RAG 流水线中 Transformer 角色的实现。
 //
 // 本包定义了三层核心概念：
 //   - Strategy（策略枚举）：控制切块行为的分发开关
@@ -7,13 +7,13 @@
 //
 // 调用方通过 NewChunker(strategy) 获取对应的 Chunker 实现：
 //
-//	free  := embedding.NewChunker(embedding.StrategyFree)         // 递归字符分割
-//	md    := embedding.NewChunker(embedding.StrategyMD)           // 元素分类+标题聚合
-//	eino  := embedding.NewChunker(embedding.StrategyEino)         // 语义向量分割
-//	hier  := embedding.NewChunker(embedding.StrategyHierarchical) // 上下文感知分层切分
+//	free  := chunk.NewChunker(chunk.StrategyFree)         // 递归字符分割
+//	md    := chunk.NewChunker(chunk.StrategyMD)           // 元素分类+标题聚合
+//	eino  := chunk.NewChunker(chunk.StrategyEino)         // 语义向量分割
+//	hier  := chunk.NewChunker(chunk.StrategyHierarchical) // 上下文感知分层切分
 //
 // 返回类型 []*schema.Document 可直接对接 Eino 的 Indexer.Store。
-package embedding
+package chunk
 
 import (
 	"context"

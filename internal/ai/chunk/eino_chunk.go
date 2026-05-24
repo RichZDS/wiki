@@ -1,4 +1,4 @@
-package embedding
+package chunk
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"aisearch/internal/ai/embedding"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -20,11 +22,11 @@ import (
 //  4. 在相似度谷值处切分
 //  5. 贪心合并句子至接近 chunkSize
 type einoChunker struct {
-	embedder Embedder
+	embedder embedding.Embedder
 }
 
 // NewEinoChunker 创建语义切块器，需注入 Embedder 实现。
-func NewEinoChunker(emb Embedder) *einoChunker {
+func NewEinoChunker(emb embedding.Embedder) *einoChunker {
 	return &einoChunker{embedder: emb}
 }
 
