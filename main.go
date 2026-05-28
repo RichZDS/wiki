@@ -18,7 +18,7 @@ func main() {
 	cfg := config.Load()
 
 	logger.Init(cfg.Env)
-	log := logger.GetLogger()
+	logger := logger.GetLogger()
 
 	database.InitMySQL(cfg.MySQL)
 	defer database.Close()
@@ -29,9 +29,9 @@ func main() {
 	r := router.New(cfg)
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 
-	log.Printf("server started on http://localhost%s (env=%s)", addr, cfg.Env)
+	logger.Printf("server started on http://localhost%s (env=%s)", addr, cfg.Env)
 
 	if err := r.Run(addr); err != nil {
-		log.Fatalf("server stopped: %v", err)
+		logger.Fatalf("server stopped: %v", err)
 	}
 }

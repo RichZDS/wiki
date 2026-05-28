@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -42,13 +43,38 @@ type RedisConfig struct {
 	DB       int    `yaml:"db"`
 }
 
+func resolveConfigPath(filename string) string {
+	if p := os.Getenv("APP_CONFIG"); p != "" {
+		return p
+	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		return filename
+	}
+
+	for {
+		candidate := filepath.Join(dir, filename)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return filename
+}
+
 func Load() Config {
 	env := os.Getenv("APP_ENV")
 	if env == "" {
 		env = "dev"
 	}
 
-	cfg := mustLoadYAML("config.yaml")
+	cfg := mustLoadYAML(resolveConfigPath("config.yaml"))
 
 	if env == "prod" {
 		override := mustLoadYAML("config.prod.yaml")

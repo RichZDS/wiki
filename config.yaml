@@ -10,7 +10,7 @@ mysql:
   port: 3306
   user: root
   password: "12345678"
-  database: aisearch_dev
+  database: wiki
   charset: utf8mb4
   max_idle_conns: 10
   max_open_conns: 100
