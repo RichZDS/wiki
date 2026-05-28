@@ -3,22 +3,21 @@ package response
 import "github.com/gin-gonic/gin"
 
 type Body struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
+	Code int    `json:"code"`
+	Data any    `json:"data"`
+	Err  string `json:"err"`
 }
 
-func Success(c *gin.Context, status int, data any) {
-	c.JSON(status, Body{
-		Code:    status,
-		Message: "success",
-		Data:    data,
+func Success(c *gin.Context, code int, data any) {
+	c.JSON(code, Body{
+		Code: code,
+		Data: data,
 	})
 }
 
-func Error(c *gin.Context, status int, message string) {
-	c.JSON(status, Body{
-		Code:    status,
-		Message: message,
+func Error(c *gin.Context, code int, err string) {
+	c.JSON(code, Body{
+		Code: code,
+		Err:  err,
 	})
 }
