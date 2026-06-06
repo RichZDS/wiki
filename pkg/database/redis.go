@@ -13,6 +13,7 @@ import (
 
 var RDB *redis.Client
 
+// InitRedis 初始化对应的基础设施组件。
 func InitRedis(cfg config.RedisConfig) {
 	RDB = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
@@ -30,6 +31,7 @@ func InitRedis(cfg config.RedisConfig) {
 	logger.GetLogger().Printf("Redis 连接成功 %s:%s (db=%d)", cfg.Host, cfg.Port, cfg.DB)
 }
 
+// CloseRedis 关闭对应资源并释放连接。
 func CloseRedis() {
 	if RDB != nil {
 		RDB.Close()

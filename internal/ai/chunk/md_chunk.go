@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"aisearch/internal/model"
+
 	"github.com/cloudwego/eino/schema"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -18,23 +20,20 @@ import (
 //  2. 以标题为 section 边界，同 section 内贪心聚合至接近 chunkSize
 //  3. 代码块、列表、引用块等原子元素不被内部切分
 //  4. 超长 section 用 freeChunker 兜底
-type mdChunker struct{}
+type mdChunker = model.MarkdownChunker
 
 // NewMDChunker 返回 Markdown 元素分类切块器。
 func NewMDChunker() *mdChunker {
-	return &mdChunker{}
+	return &model.MarkdownChunker{ChunkFunc: mdChunk}
 }
 
-// mdElement 表示 Markdown AST 中的一个可切块元素。
-type mdElement struct {
-	typ         string // paragraph / code_block / list / table / blockquote / thematic_break / html_block
-	headingPath string // 当前标题层级路径，如 "Chapter 1 > Section 1.1"
-	content     string // 元素原始 Markdown 文本
-	level       int    // 最近的标题层级 (1-6)，0 表示无标题
-}
+type mdElement = model.MarkdownElement
+type markdownChunk = model.MarkdownChunk
+type headingEntry = model.HeadingEntry
+type headingStack = model.HeadingStack
 
 // Chunk 执行 Markdown 元素分类切块。
-func (c *mdChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
+func mdChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
 	sanitizeConfig(&cfg)
 	if len(content) == 0 {
 		return nil, nil
@@ -56,7 +55,7 @@ func (c *mdChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) 
 	chunks := aggregateElements(elements, cfg)
 	docs := make([]*schema.Document, len(chunks))
 	for i, c := range chunks {
-		docs[i] = c.toDocument(i, len(chunks))
+		docs[i] = markdownChunkToDocument(&c, i, len(chunks))
 	}
 	return docs, nil
 }
@@ -78,9 +77,9 @@ func parseElements(content string) []mdElement {
 		switch n.Kind() {
 		case ast.KindHeading:
 			h := n.(*ast.Heading)
-			headingStack.push(headingEntry{
-				text:  extractText(source, n),
-				level: h.Level,
+			pushHeading(headingStack, headingEntry{
+				Text:  extractText(source, n),
+				Level: h.Level,
 			})
 
 		case ast.KindParagraph:
@@ -88,50 +87,50 @@ func parseElements(content string) []mdElement {
 				return ast.WalkContinue, nil
 			}
 			elements = append(elements, mdElement{
-				typ:         "paragraph",
-				headingPath: headingStack.path(),
-				content:     linesToString(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "paragraph",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     linesToString(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 
 		case ast.KindFencedCodeBlock:
 			elements = append(elements, mdElement{
-				typ:         "code_block",
-				headingPath: headingStack.path(),
-				content:     rawSegment(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "code_block",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     rawSegment(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 
 		case ast.KindList:
 			elements = append(elements, mdElement{
-				typ:         "list",
-				headingPath: headingStack.path(),
-				content:     rawSegment(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "list",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     rawSegment(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 
 		case ast.KindBlockquote:
 			elements = append(elements, mdElement{
-				typ:         "blockquote",
-				headingPath: headingStack.path(),
-				content:     rawSegment(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "blockquote",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     rawSegment(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 
 		case ast.KindThematicBreak:
 			elements = append(elements, mdElement{
-				typ:         "thematic_break",
-				headingPath: headingStack.path(),
-				content:     rawSegment(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "thematic_break",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     rawSegment(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 
 		case ast.KindHTMLBlock:
 			elements = append(elements, mdElement{
-				typ:         "html_block",
-				headingPath: headingStack.path(),
-				content:     rawSegment(source, n),
-				level:       headingStack.currentLevel(),
+				Type:        "html_block",
+				HeadingPath: headingStackPath(headingStack),
+				Content:     rawSegment(source, n),
+				Level:       headingStackCurrentLevel(headingStack),
 			})
 		}
 		return ast.WalkContinue, nil
@@ -140,35 +139,28 @@ func parseElements(content string) []mdElement {
 	return elements
 }
 
-// mdChunk 聚合后的 Markdown 块。
-type mdChunk struct {
-	content      string
-	headingPath  string
-	elementTypes []string
-	level        int
-}
-
-func (c *mdChunk) toDocument(index, total int) *schema.Document {
+// markdownChunkToDocument 将 Markdown 块转换为标准文档。
+func markdownChunkToDocument(c *markdownChunk, index, total int) *schema.Document {
 	return &schema.Document{
 		ID:      fmt.Sprintf("chunk_%d", index),
-		Content: c.content,
+		Content: c.Content,
 		MetaData: map[string]any{
 			metaKeyChunkIndex:    index,
 			metaKeyTotalChunks:   total,
-			metaKeyHeadingPath:   c.headingPath,
-			metaKeyElementTypes:  dedupeTypes(c.elementTypes),
+			metaKeyHeadingPath:   c.HeadingPath,
+			metaKeyElementTypes:  dedupeTypes(c.ElementTypes),
 			metaKeyChunkStrategy: "md",
 		},
 	}
 }
 
 // aggregateElements 将元素列表聚合为不超过 chunkSize 的块。
-func aggregateElements(elements []mdElement, cfg ChunkConfig) []mdChunk {
+func aggregateElements(elements []mdElement, cfg ChunkConfig) []markdownChunk {
 	if len(elements) == 0 {
 		return nil
 	}
 
-	var chunks []mdChunk
+	var chunks []markdownChunk
 	var buf []mdElement
 	bufLen := 0
 	bufPath := ""
@@ -184,33 +176,33 @@ func aggregateElements(elements []mdElement, cfg ChunkConfig) []mdChunk {
 			if sb.Len() > 0 {
 				sb.WriteString("\n\n")
 			}
-			sb.WriteString(e.content)
-			types = append(types, e.typ)
+			sb.WriteString(e.Content)
+			types = append(types, e.Type)
 		}
-		chunks = append(chunks, mdChunk{
-			content:      sb.String(),
-			headingPath:  bufPath,
-			elementTypes: types,
-			level:        bufLevel,
+		chunks = append(chunks, markdownChunk{
+			Content:      sb.String(),
+			HeadingPath:  bufPath,
+			ElementTypes: types,
+			Level:        bufLevel,
 		})
 		buf = nil
 		bufLen = 0
 	}
 
 	for _, e := range elements {
-		el := len([]rune(e.content))
+		el := len([]rune(e.Content))
 
 		// 标题路径变化作为 section 边界
-		if e.headingPath != bufPath && len(buf) > 0 {
+		if e.HeadingPath != bufPath && len(buf) > 0 {
 			flush()
 		}
-		if bufPath == "" || (e.headingPath != "" && e.headingPath != bufPath) {
-			bufPath = e.headingPath
-			bufLevel = e.level
+		if bufPath == "" || (e.HeadingPath != "" && e.HeadingPath != bufPath) {
+			bufPath = e.HeadingPath
+			bufLevel = e.Level
 		}
 
 		// 原子元素如果单元素就超长，强制截断
-		if isAtomic(e.typ) && el > cfg.ChunkSize {
+		if isAtomic(e.Type) && el > cfg.ChunkSize {
 			flush()
 			chunks = append(chunks, splitAtomicElement(e, cfg.ChunkSize))
 			continue
@@ -241,40 +233,40 @@ func isAtomic(typ string) bool {
 }
 
 // splitAtomicElement 将超长原子元素强制按 chunkSize 截断。
-func splitAtomicElement(e mdElement, chunkSize int) mdChunk {
-	runes := []rune(e.content)
+func splitAtomicElement(e mdElement, chunkSize int) markdownChunk {
+	runes := []rune(e.Content)
 	if len(runes) <= chunkSize {
-		return mdChunk{
-			content:      e.content,
-			headingPath:  e.headingPath,
-			elementTypes: []string{e.typ},
-			level:        e.level,
+		return markdownChunk{
+			Content:      e.Content,
+			HeadingPath:  e.HeadingPath,
+			ElementTypes: []string{e.Type},
+			Level:        e.Level,
 		}
 	}
-	return mdChunk{
-		content:      string(runes[:chunkSize]),
-		headingPath:  e.headingPath,
-		elementTypes: []string{e.typ, "split_" + e.typ},
-		level:        e.level,
+	return markdownChunk{
+		Content:      string(runes[:chunkSize]),
+		HeadingPath:  e.HeadingPath,
+		ElementTypes: []string{e.Type, "split_" + e.Type},
+		Level:        e.Level,
 	}
 }
 
 // flattenOversized 将聚合后仍然超长的块用 freeChunker 二次细分。
-func flattenOversized(chunks []mdChunk, cfg ChunkConfig) []mdChunk {
-	fc := &freeChunker{}
-	var result []mdChunk
+func flattenOversized(chunks []markdownChunk, cfg ChunkConfig) []markdownChunk {
+	fc := NewFreeChunker()
+	var result []markdownChunk
 	for _, ch := range chunks {
-		if len([]rune(ch.content)) <= cfg.ChunkSize {
+		if len([]rune(ch.Content)) <= cfg.ChunkSize {
 			result = append(result, ch)
 			continue
 		}
-		docs, _ := fc.Chunk(context.Background(), ch.content, cfg)
+		docs, _ := fc.Chunk(context.Background(), ch.Content, cfg)
 		for _, d := range docs {
-			result = append(result, mdChunk{
-				content:      d.Content,
-				headingPath:  ch.headingPath,
-				elementTypes: ch.elementTypes,
-				level:        ch.level,
+			result = append(result, markdownChunk{
+				Content:      d.Content,
+				HeadingPath:  ch.HeadingPath,
+				ElementTypes: ch.ElementTypes,
+				Level:        ch.Level,
 			})
 		}
 	}
@@ -296,48 +288,37 @@ func dedupeTypes(types []string) []string {
 
 // --- heading stack ---
 
-type headingEntry struct {
-	text  string
-	level int
-}
-
-type headingStack struct {
-	stack []headingEntry
-}
-
+// newHeadingStack 创建空的 Markdown 标题层级栈。
 func newHeadingStack() *headingStack {
-	return &headingStack{}
+	return &model.HeadingStack{}
 }
 
-func (s *headingStack) push(h headingEntry) {
-	for len(s.stack) > 0 && s.stack[len(s.stack)-1].level >= h.level {
-		s.stack = s.stack[:len(s.stack)-1]
+// pushHeading 将标题压入层级栈并移除同级或更低级标题。
+func pushHeading(s *headingStack, h headingEntry) {
+	for len(s.Stack) > 0 && s.Stack[len(s.Stack)-1].Level >= h.Level {
+		s.Stack = s.Stack[:len(s.Stack)-1]
 	}
-	s.stack = append(s.stack, h)
+	s.Stack = append(s.Stack, h)
 }
 
-func (s *headingStack) pop() {
-	if len(s.stack) > 0 {
-		s.stack = s.stack[:len(s.stack)-1]
-	}
-}
-
-func (s *headingStack) path() string {
-	if len(s.stack) == 0 {
+// headingStackPath 返回当前标题层级的完整路径。
+func headingStackPath(s *headingStack) string {
+	if len(s.Stack) == 0 {
 		return ""
 	}
-	parts := make([]string, len(s.stack))
-	for i, h := range s.stack {
-		parts[i] = strings.TrimSpace(h.text)
+	parts := make([]string, len(s.Stack))
+	for i, h := range s.Stack {
+		parts[i] = strings.TrimSpace(h.Text)
 	}
 	return strings.Join(parts, " > ")
 }
 
-func (s *headingStack) currentLevel() int {
-	if len(s.stack) == 0 {
+// headingStackCurrentLevel 返回当前标题的层级。
+func headingStackCurrentLevel(s *headingStack) int {
+	if len(s.Stack) == 0 {
 		return 0
 	}
-	return s.stack[len(s.stack)-1].level
+	return s.Stack[len(s.Stack)-1].Level
 }
 
 // --- goldmark helpers ---

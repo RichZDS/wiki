@@ -10,6 +10,7 @@ import (
 	tests "aisearch/tests"
 )
 
+// TestInMemoryBackendWriteRead 验证内存文件后端的写入和读取。
 func TestInMemoryBackendWriteRead(t *testing.T) {
 	ctx := context.Background()
 	backend := filesystem.NewInMemoryBackend()
@@ -34,6 +35,7 @@ func TestInMemoryBackendWriteRead(t *testing.T) {
 	t.Logf("Write/Read OK: %d bytes", len(fc.Content))
 }
 
+// TestInMemoryBackendEdit 验证内存文件后端的编辑能力。
 func TestInMemoryBackendEdit(t *testing.T) {
 	ctx := context.Background()
 	backend := filesystem.NewInMemoryBackend()
@@ -66,6 +68,7 @@ func TestInMemoryBackendEdit(t *testing.T) {
 // on Windows: filepath.Clean converts "/" to "\", but the rest of the code
 // uses literal "/" for path prefix matching, causing GrepRaw/LsInfo/GlobInfo
 // to return empty results on Windows.
+// TestInMemoryBackendPathNormalizationBug 验证路径规范化场景不会回归。
 func TestInMemoryBackendPathNormalizationBug(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("this test verifies a Windows-specific path normalization bug")

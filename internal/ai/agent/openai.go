@@ -5,15 +5,15 @@ import (
 	"log"
 	"os"
 
+	internalmodel "aisearch/internal/model"
 	"aisearch/pkg/utils"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
 )
 
-type OpenAIAgent struct {
-	Model *openai.ChatModel
-}
+type OpenAIAgent = internalmodel.OpenAIAgent
 
+// NewOpenAIAgent 创建并初始化对应的实例。
 func NewOpenAIAgent(ctx context.Context) *OpenAIAgent {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
@@ -38,5 +38,5 @@ func NewOpenAIAgent(ctx context.Context) *OpenAIAgent {
 		log.Fatalf("failed to create openai agent: %v", err)
 	}
 
-	return &OpenAIAgent{Model: m}
+	return &internalmodel.OpenAIAgent{Model: m}
 }

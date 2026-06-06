@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"aisearch/internal/ai/embedding"
+	"aisearch/internal/model"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -21,18 +22,20 @@ import (
 //  3. 计算相邻句余弦相似度
 //  4. 在相似度谷值处切分
 //  5. 贪心合并句子至接近 chunkSize
-type einoChunker struct {
-	embedder embedding.Embedder
-}
+type einoChunker = model.EinoChunker
 
 // NewEinoChunker 创建语义切块器，需注入 Embedder 实现。
 func NewEinoChunker(emb embedding.Embedder) *einoChunker {
-	return &einoChunker{embedder: emb}
+	return &model.EinoChunker{
+		ChunkFunc: func(ctx context.Context, content string, cfg model.ChunkConfig) ([]*schema.Document, error) {
+			return einoChunk(ctx, content, cfg, emb)
+		},
+	}
 }
 
 // Chunk 执行语义切块。
-func (c *einoChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
-	if c.embedder == nil {
+func einoChunk(ctx context.Context, content string, cfg ChunkConfig, embedder embedding.Embedder) ([]*schema.Document, error) {
+	if embedder == nil {
 		return nil, fmt.Errorf("einoChunker: Embedder is required, use NewEinoChunker(embedder) to construct")
 	}
 	sanitizeConfig(&cfg)
@@ -51,7 +54,7 @@ func (c *einoChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig
 	}
 
 	// 2. 计算句向量
-	vectors, err := c.embedder.EmbedStrings(ctx, sentences)
+	vectors, err := embedder.EmbedStrings(ctx, sentences)
 	if err != nil {
 		return nil, fmt.Errorf("einoChunker: embed failed: %w", err)
 	}

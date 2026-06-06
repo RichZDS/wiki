@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"aisearch/internal/config"
+	"aisearch/internal/model"
 	"aisearch/pkg/logger"
 
 	"gorm.io/driver/mysql"
@@ -16,16 +17,10 @@ import (
 
 var DB *gorm.DB
 
-// gormLogWriter 适配器，将 GORM 日志输出到项目的 log.Logger（同时写入 stdout + 每日滚动文件）。
-type gormLogWriter struct{}
-
-func (w *gormLogWriter) Printf(format string, args ...any) {
-	logger.GetLogger().Printf(format, args...)
-}
-
+// newGormLogger 创建接入项目日志系统的 GORM 日志器。
 func newGormLogger() gormlogger.Interface {
 	return gormlogger.New(
-		&gormLogWriter{},
+		&model.GormLoggerWriter{Logger: logger.GetLogger()},
 		gormlogger.Config{
 			SlowThreshold:             200 * time.Millisecond,
 			LogLevel:                  gormlogger.Info,
@@ -35,6 +30,7 @@ func newGormLogger() gormlogger.Interface {
 	)
 }
 
+// InitMySQL 初始化 MySQL 连接池并验证连接可用性。
 func InitMySQL(cfg config.MySQLConfig) {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=%s&parseTime=True&loc=Local",
 		cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database, cfg.Charset)
@@ -63,6 +59,7 @@ func InitMySQL(cfg config.MySQLConfig) {
 		cfg.Host, cfg.Port, cfg.Database, cfg.MaxOpenConns, cfg.MaxIdleConns)
 }
 
+// Close 关闭 MySQL 底层连接池。
 func Close() {
 	if DB != nil {
 		sqlDB, _ := DB.DB()

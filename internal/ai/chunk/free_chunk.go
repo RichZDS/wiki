@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"aisearch/internal/model"
+
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -17,18 +19,19 @@ import (
 // 当 cfg.Separators 为空时，使用默认分隔符优先级：
 //
 //	"\n\n" → "\n" → "。" → "." → "，" → "," → " " → ""（按字符兜底）
-type freeChunker struct{}
+type freeChunker = model.FreeChunker
 
 // 默认分隔符优先级列表。末尾 "" 表示逐字符拆分——任何文本都能被切分。
 var defaultSeparators = []string{"\n\n", "\n", "。", ".", "，", ",", " ", ""}
 
+// NewFreeChunker 创建自由文本切块器。
 func NewFreeChunker() *freeChunker {
-	return &freeChunker{}
+	return &model.FreeChunker{ChunkFunc: freeChunk}
 }
 
 // Chunk 执行自由切块。
 // 空内容直接返回 (nil, nil)；单块内容直接返回一个 Document。
-func (c *freeChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
+func freeChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
 	// --- 参数兜底 ---
 	seps := cfg.Separators
 	if len(seps) == 0 {

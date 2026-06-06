@@ -13,6 +13,7 @@ type User struct {
 	UpdatedAt time.Time `gorm:"not null" json:"updated_at"`
 }
 
+// TableName 返回当前模型对应的数据库表名。
 func (User) TableName() string {
 	return "user"
 }

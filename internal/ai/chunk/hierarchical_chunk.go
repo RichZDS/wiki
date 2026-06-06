@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"aisearch/internal/model"
+
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -15,19 +17,17 @@ import (
 //
 // 父子通过 metadata 关联：子块记录 parent_content / parent_chunk_id，
 // 父块记录 child_chunk_ids。返回切片中父块在前、子块在后。
-type hierarchicalChunker struct {
-	mdChunker *mdChunker
-}
+type hierarchicalChunker = model.HierarchicalChunker
 
 // NewHierarchicalChunker 创建上下文感知分层切块器。
 func NewHierarchicalChunker() *hierarchicalChunker {
-	return &hierarchicalChunker{mdChunker: &mdChunker{}}
+	return &model.HierarchicalChunker{ChunkFunc: hierarchicalChunk}
 }
 
 const parentSizeMultiplier = 3
 
 // Chunk 执行分层切块。
-func (c *hierarchicalChunker) Chunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
+func hierarchicalChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
 	sanitizeConfig(&cfg)
 	if len(content) == 0 {
 		return nil, nil
@@ -44,7 +44,7 @@ func (c *hierarchicalChunker) Chunk(ctx context.Context, content string, cfg Chu
 	parentCfg := cfg
 	parentCfg.ChunkSize = cfg.ChunkSize * parentSizeMultiplier
 	parentCfg.ChunkOverlap = 0 // 父级不需要 overlap
-	parentDocs, err := c.mdChunker.Chunk(ctx, content, parentCfg)
+	parentDocs, err := mdChunk(ctx, content, parentCfg)
 	if err != nil {
 		return nil, fmt.Errorf("hierarchicalChunker: parent chunking failed: %w", err)
 	}
@@ -74,7 +74,7 @@ func (c *hierarchicalChunker) Chunk(ctx context.Context, content string, cfg Chu
 		}
 
 		// 对父块内容进行子级切块
-		childDocs, err := c.mdChunker.Chunk(ctx, pDoc.Content, childCfg)
+		childDocs, err := mdChunk(ctx, pDoc.Content, childCfg)
 		if err != nil {
 			return nil, fmt.Errorf("hierarchicalChunker: child chunking failed: %w", err)
 		}

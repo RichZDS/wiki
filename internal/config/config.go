@@ -4,45 +4,18 @@ import (
 	"os"
 	"path/filepath"
 
+	"aisearch/internal/model"
+
 	"gopkg.in/yaml.v3"
 )
 
-type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Log      LogConfig      `yaml:"log"`
-	MySQL    MySQLConfig    `yaml:"mysql"`
-	Redis    RedisConfig    `yaml:"redis"`
-	Env      string         `yaml:"-"`
-}
+type Config = model.Config
+type ServerConfig = model.ServerConfig
+type LogConfig = model.LogConfig
+type MySQLConfig = model.MySQLConfig
+type RedisConfig = model.RedisConfig
 
-type ServerConfig struct {
-	Port    string `yaml:"port"`
-	AppName string `yaml:"app_name"`
-}
-
-type LogConfig struct {
-	Level string `yaml:"level"`
-}
-
-type MySQLConfig struct {
-	Host            string `yaml:"host"`
-	Port            string `yaml:"port"`
-	User            string `yaml:"user"`
-	Password        string `yaml:"password"`
-	Database        string `yaml:"database"`
-	Charset         string `yaml:"charset"`
-	MaxIdleConns    int    `yaml:"max_idle_conns"`
-	MaxOpenConns    int    `yaml:"max_open_conns"`
-	ConnMaxLifetime int    `yaml:"conn_max_lifetime"`
-}
-
-type RedisConfig struct {
-	Host     string `yaml:"host"`
-	Port     string `yaml:"port"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
-}
-
+// resolveConfigPath 从环境变量或上级目录中查找配置文件。
 func resolveConfigPath(filename string) string {
 	if p := os.Getenv("APP_CONFIG"); p != "" {
 		return p
@@ -68,6 +41,7 @@ func resolveConfigPath(filename string) string {
 	return filename
 }
 
+// Load 加载当前运行环境的完整配置。
 func Load() Config {
 	env := os.Getenv("APP_ENV")
 	if env == "" {
@@ -94,6 +68,7 @@ func Load() Config {
 	return cfg
 }
 
+// mustLoadYAML 读取并解析 YAML 配置，失败时终止初始化。
 func mustLoadYAML(path string) Config {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -107,6 +82,7 @@ func mustLoadYAML(path string) Config {
 	return cfg
 }
 
+// merge 将非零的环境配置覆盖到基础配置。
 func merge(base, override Config) Config {
 	if override.Server.Port != "" {
 		base.Server.Port = override.Server.Port

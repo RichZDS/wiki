@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// New 创建并初始化对应的实例。
 func New(cfg config.Config) *gin.Engine {
 	if cfg.Env == "prod" {
 		gin.SetMode(gin.ReleaseMode)

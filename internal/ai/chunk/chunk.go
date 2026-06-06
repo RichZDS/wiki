@@ -19,6 +19,8 @@ import (
 	"context"
 	"fmt"
 
+	"aisearch/internal/model"
+
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -49,17 +51,7 @@ const (
 //	    ChunkOverlap: 30,
 //	    Separators:   []string{"\n\n", "\n", "。"},
 //	}
-type ChunkConfig struct {
-	// ChunkSize 每块最大字符数（rune 计数），<= 0 时使用默认值 500。
-	ChunkSize int
-	// ChunkOverlap 相邻两块之间的重叠字符数，0 表示无重叠。
-	// 重叠可减少因硬截断导致的上下文丢失，但会增加总 token 消耗。
-	ChunkOverlap int
-	// Separators 分隔符优先级列表，仅 StrategyFree 生效。
-	// 默认值：["\n\n", "\n", "。", ".", "，", ",", " ", ""]
-	// 列表末尾的空字符串 "" 表示按单字符兜底拆分。
-	Separators []string
-}
+type ChunkConfig = model.ChunkConfig
 
 // Chunker 统一切块接口，对齐 Eino document.Transformer 返回签名。
 // 所有切块策略必须实现此接口。
@@ -77,25 +69,25 @@ type Chunker interface {
 func NewChunker(strategy Strategy) Chunker {
 	switch strategy {
 	case StrategyMD:
-		return &mdChunker{}
+		return NewMDChunker()
 	case StrategyEino:
-		return &einoChunker{}
+		return NewEinoChunker(nil)
 	case StrategyHierarchical:
-		return &hierarchicalChunker{mdChunker: &mdChunker{}}
+		return NewHierarchicalChunker()
 	default:
-		return &freeChunker{}
+		return NewFreeChunker()
 	}
 }
 
 // 写入 schema.Document.MetaData 时使用的键名。
 const (
-	metaKeyChunkIndex    = "chunk_index"    // 当前块序号，0-based
-	metaKeyTotalChunks   = "chunk_total"    // 该文档被切分的总块数
-	metaKeyHeadingPath   = "heading_path"   // 标题路径，如 "Chapter 1 > Section 1.1"
-	metaKeyElementTypes  = "element_types"  // 块内包含的元素类型列表
-	metaKeyChunkStrategy = "chunk_strategy" // 生成该块的策略名
-	metaKeyChunkRole     = "chunk_role"     // 分层切块中的角色: "parent" / "child"
-	metaKeyParentContent = "parent_content" // 父块完整文本（子块用）
+	metaKeyChunkIndex    = "chunk_index"     // 当前块序号，0-based
+	metaKeyTotalChunks   = "chunk_total"     // 该文档被切分的总块数
+	metaKeyHeadingPath   = "heading_path"    // 标题路径，如 "Chapter 1 > Section 1.1"
+	metaKeyElementTypes  = "element_types"   // 块内包含的元素类型列表
+	metaKeyChunkStrategy = "chunk_strategy"  // 生成该块的策略名
+	metaKeyChunkRole     = "chunk_role"      // 分层切块中的角色: "parent" / "child"
+	metaKeyParentContent = "parent_content"  // 父块完整文本（子块用）
 	metaKeyParentChunkID = "parent_chunk_id" // 父块 ID（子块用）
 	metaKeyChildChunkIDs = "child_chunk_ids" // 子块 ID 列表（父块用）
 )

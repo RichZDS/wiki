@@ -8,6 +8,7 @@ import (
 )
 
 // TempDir creates a temporary directory for testing and returns a cleanup function.
+// TempDir 创建测试临时目录并返回清理函数。
 func TempDir(t *testing.T, pattern string) (string, func()) {
 	t.Helper()
 	dir, err := os.MkdirTemp("", pattern)
@@ -21,6 +22,7 @@ func TempDir(t *testing.T, pattern string) (string, func()) {
 }
 
 // WriteFile writes content to path relative to base and returns the full path.
+// WriteFile 在测试目录中写入指定内容。
 func WriteFile(t *testing.T, base, rel, content string) string {
 	t.Helper()
 	full := filepath.Join(base, rel)
@@ -34,6 +36,7 @@ func WriteFile(t *testing.T, base, rel, content string) string {
 }
 
 // AssertNoErr fails the test if err is not nil.
+// AssertNoErr 断言测试过程没有返回错误。
 func AssertNoErr(t *testing.T, err error, msg string) {
 	t.Helper()
 	if err != nil {
@@ -42,6 +45,7 @@ func AssertNoErr(t *testing.T, err error, msg string) {
 }
 
 // AssertEqual fails the test if got != want.
+// AssertEqual 断言实际值与期望值相等。
 func AssertEqual[T comparable](t *testing.T, got, want T, label string) {
 	t.Helper()
 	if got != want {
@@ -50,6 +54,7 @@ func AssertEqual[T comparable](t *testing.T, got, want T, label string) {
 }
 
 // AssertTrue fails the test if cond is false.
+// AssertTrue 断言给定条件为真。
 func AssertTrue(t *testing.T, cond bool, msg string) {
 	t.Helper()
 	if !cond {

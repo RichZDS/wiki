@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// pepper 获取密码哈希使用的环境级加密因子。
 func pepper() string {
 	if p := os.Getenv("PASSWORD_PEPPER"); p != "" {
 		return p

@@ -4,21 +4,18 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"sync"
 	"time"
+
+	"aisearch/internal/model"
 )
 
 const epoch = 1704038400000 // 2024-01-01 00:00:00 UTC in milliseconds
 
-type Generator struct {
-	mu       sync.Mutex
-	workerID int64
-	sequence int64
-	lastTs   int64
-}
+type Generator = model.SnowflakeGenerator
 
-var global *Generator
+var global *model.SnowflakeGenerator
 
+// init 根据环境变量初始化全局雪花编号生成器。
 func init() {
 	workerID := int64(1)
 	if s := os.Getenv("SNOWFLAKE_WORKER_ID"); s != "" {
@@ -26,34 +23,36 @@ func init() {
 			workerID = n
 		}
 	}
-	global = &Generator{workerID: workerID}
+	global = &model.SnowflakeGenerator{WorkerID: workerID}
 }
 
+// Next 生成下一个全局唯一的雪花编号。
 func Next() int64 {
-	return global.next()
+	return next(global)
 }
 
-func (g *Generator) next() int64 {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+// next 根据时间戳、工作节点和序列号生成雪花编号。
+func next(g *model.SnowflakeGenerator) int64 {
+	g.Mu.Lock()
+	defer g.Mu.Unlock()
 
 	ts := time.Now().UnixMilli()
-	if ts < g.lastTs {
-		panic(fmt.Sprintf("snowflake: clock moved backwards, refusing to generate id for %d ms", g.lastTs-ts))
+	if ts < g.LastTs {
+		panic(fmt.Sprintf("snowflake: clock moved backwards, refusing to generate id for %d ms", g.LastTs-ts))
 	}
 
-	if ts == g.lastTs {
-		g.sequence = (g.sequence + 1) & 0xFFF
-		if g.sequence == 0 {
-			for ts <= g.lastTs {
+	if ts == g.LastTs {
+		g.Sequence = (g.Sequence + 1) & 0xFFF
+		if g.Sequence == 0 {
+			for ts <= g.LastTs {
 				ts = time.Now().UnixMilli()
 			}
 		}
 	} else {
-		g.sequence = 0
+		g.Sequence = 0
 	}
 
-	g.lastTs = ts
+	g.LastTs = ts
 
-	return (ts-epoch)<<22 | g.workerID<<12 | g.sequence
+	return (ts-epoch)<<22 | g.WorkerID<<12 | g.Sequence
 }

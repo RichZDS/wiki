@@ -191,6 +191,7 @@ func TestFreeChunkerLong(t *testing.T) {
 	}
 }
 
+// TestFreeChunkerEmpty 验证自由切块器处理空文本的行为。
 func TestFreeChunkerEmpty(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyFree)
 	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{ChunkSize: 100})
@@ -203,6 +204,7 @@ func TestFreeChunkerEmpty(t *testing.T) {
 	t.Log("empty input → 0 chunks")
 }
 
+// TestFreeChunkerMetadata 验证自由切块结果包含正确元数据。
 func TestFreeChunkerMetadata(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyFree)
 	docs, err := chunker.Chunk(context.Background(), "Hello World. This is a test.", chunk.ChunkConfig{
@@ -230,6 +232,7 @@ func TestFreeChunkerMetadata(t *testing.T) {
 
 }
 
+// truncate 将字符串截断到指定的最大字符数。
 func truncate(s string, maxLen int) string {
 	r := []rune(s)
 	if len(r) <= maxLen {
@@ -238,6 +241,7 @@ func truncate(s string, maxLen int) string {
 	return string(r[:maxLen]) + "..."
 }
 
+// fmtPrintDocs 将切块文档格式化输出到测试日志。
 func fmtPrintDocs(t *testing.T, docs []*schema.Document) {
 	t.Helper()
 	fmt.Println("\n========== Chunking Result ==========")

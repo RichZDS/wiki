@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"aisearch/internal/model"
 	"aisearch/internal/service"
 	"aisearch/pkg/response"
 
@@ -11,37 +12,29 @@ import (
 	"gorm.io/gorm"
 )
 
-type createUserReq struct {
-	Name     string `json:"name"     binding:"required"`
-	Password string `json:"password" binding:"required"`
-	Quota    int64  `json:"quota"`
-	Remark   string `json:"remark"`
-}
+type UserController = model.UserController
 
-type updateUserReq struct {
-	Name     string  `json:"name"`
-	Password string  `json:"password"`
-	Quota    *int64  `json:"quota"`
-	Remark   *string `json:"remark"`
-}
-
-type UserController struct {
-	svc *service.UserService
-}
-
+// NewUserController 创建用户控制器并绑定处理函数。
 func NewUserController() *UserController {
-	return &UserController{svc: service.NewUserService()}
+	svc := service.NewUserService()
+	return &model.UserController{
+		CreateFunc: func(ctx *gin.Context) { create(ctx, svc) },
+		ListFunc:   func(ctx *gin.Context) { list(ctx, svc) },
+		GetFunc:    func(ctx *gin.Context) { get(ctx, svc) },
+		UpdateFunc: func(ctx *gin.Context) { update(ctx, svc) },
+		DeleteFunc: func(ctx *gin.Context) { deleteUser(ctx, svc) },
+	}
 }
 
-// Create POST /api/v1/users
-func (ctl *UserController) Create(c *gin.Context) {
-	var req createUserReq
+// create 处理创建用户的 HTTP 请求。
+func create(c *gin.Context, svc *service.UserService) {
+	var req model.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
 		return
 	}
 
-	user, err := ctl.svc.Create(req.Name, req.Password, req.Quota, req.Remark)
+	user, err := svc.Create(req.Name, req.Password, req.Quota, req.Remark)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "创建失败: "+err.Error())
 		return
@@ -49,12 +42,12 @@ func (ctl *UserController) Create(c *gin.Context) {
 	response.Success(c, http.StatusCreated, user)
 }
 
-// List GET /api/v1/users
-func (ctl *UserController) List(c *gin.Context) {
+// list 处理查询用户列表的 HTTP 请求。
+func list(c *gin.Context, svc *service.UserService) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
-	f := service.UserListFilter{
+	f := model.UserListFilter{
 		Name:          c.Query("name"),
 		Remark:        c.Query("remark"),
 		Sort:          c.DefaultQuery("sort", "id"),
@@ -76,7 +69,7 @@ func (ctl *UserController) List(c *gin.Context) {
 		}
 	}
 
-	result, err := ctl.svc.List(f)
+	result, err := svc.List(f)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
 		return
@@ -84,15 +77,15 @@ func (ctl *UserController) List(c *gin.Context) {
 	response.Success(c, http.StatusOK, result)
 }
 
-// Get GET /api/v1/users/:id
-func (ctl *UserController) Get(c *gin.Context) {
+// get 处理查询用户详情的 HTTP 请求。
+func get(c *gin.Context, svc *service.UserService) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 
-	user, err := ctl.svc.GetByID(id, c.Query("name"))
+	user, err := svc.GetByID(id, c.Query("name"))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "用户不存在")
 		return
@@ -100,15 +93,15 @@ func (ctl *UserController) Get(c *gin.Context) {
 	response.Success(c, http.StatusOK, user)
 }
 
-// Update PUT /api/v1/users/:id
-func (ctl *UserController) Update(c *gin.Context) {
+// update 处理更新用户的 HTTP 请求。
+func update(c *gin.Context, svc *service.UserService) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 
-	var req updateUserReq
+	var req model.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
 		return
@@ -132,7 +125,7 @@ func (ctl *UserController) Update(c *gin.Context) {
 		return
 	}
 
-	user, err := ctl.svc.Update(id, updates)
+	user, err := svc.Update(id, updates)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			response.Error(c, http.StatusNotFound, "用户不存在")
@@ -144,15 +137,15 @@ func (ctl *UserController) Update(c *gin.Context) {
 	response.Success(c, http.StatusOK, user)
 }
 
-// Delete DELETE /api/v1/users/:id
-func (ctl *UserController) Delete(c *gin.Context) {
+// deleteUser 处理删除用户的 HTTP 请求。
+func deleteUser(c *gin.Context, svc *service.UserService) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 
-	if err := ctl.svc.Delete(id); err != nil {
+	if err := svc.Delete(id); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			response.Error(c, http.StatusNotFound, "用户不存在")
 			return
@@ -163,6 +156,7 @@ func (ctl *UserController) Delete(c *gin.Context) {
 	response.Success(c, http.StatusOK, nil)
 }
 
+// stringPtr 将非空字符串转换为指针。
 func stringPtr(s string) *string {
 	if s == "" {
 		return nil

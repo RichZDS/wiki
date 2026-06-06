@@ -8,6 +8,7 @@ import (
 
 	"aisearch/internal/ai/chunk"
 	"aisearch/internal/ai/embedding"
+	"aisearch/internal/model"
 
 	tests "aisearch/tests"
 )
@@ -39,6 +40,7 @@ The second chapter begins with an overview of the architecture.`
 
 // --- FreeChunker ---
 
+// TestFreeChunker 验证自由切块器的基础切分行为。
 func TestFreeChunker(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyFree)
 	cfg := chunk.ChunkConfig{
@@ -62,6 +64,7 @@ func TestFreeChunker(t *testing.T) {
 	t.Logf("FreeChunker OK: %d chunks", len(docs))
 }
 
+// TestFreeChunkerEmpty 验证自由切块器处理空内容的行为。
 func TestFreeChunkerEmpty(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyFree)
 	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
@@ -73,6 +76,7 @@ func TestFreeChunkerEmpty(t *testing.T) {
 
 // --- mdChunker ---
 
+// TestMDChunker 验证 Markdown 切块器的基础切分行为。
 func TestMDChunker(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyMD)
 	cfg := chunk.ChunkConfig{
@@ -99,6 +103,7 @@ func TestMDChunker(t *testing.T) {
 	t.Logf("MDChunker OK: %d chunks from markdown doc", len(docs))
 }
 
+// TestMDChunkerHeadingPath 验证 Markdown 切块保留标题路径。
 func TestMDChunkerHeadingPath(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyMD)
 	content := "# Chapter 1\n## Section 1.1\nSome paragraph text under section 1.1.\n## Section 1.2\nMore text here."
@@ -118,6 +123,7 @@ func TestMDChunkerHeadingPath(t *testing.T) {
 	}
 }
 
+// TestMDChunkerCodeBlockIntegrity 验证代码块在切分时保持完整。
 func TestMDChunkerCodeBlockIntegrity(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyMD)
 	content := "# Overview\nSome intro.\n\n```go\npackage main\n\nfunc main() {\n\tfmt.Println(\"hello world\")\n}\n```\n\nAfter the code block."
@@ -138,6 +144,7 @@ func TestMDChunkerCodeBlockIntegrity(t *testing.T) {
 	t.Logf("MDChunker code block OK: %d chunks", len(docs))
 }
 
+// TestMDChunkerEmpty 验证 Markdown 切块器处理空内容的行为。
 func TestMDChunkerEmpty(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyMD)
 	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
@@ -147,6 +154,7 @@ func TestMDChunkerEmpty(t *testing.T) {
 	}
 }
 
+// TestMDChunkerShortContent 验证短 Markdown 内容不会被过度切分。
 func TestMDChunkerShortContent(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyMD)
 	docs, err := chunker.Chunk(context.Background(), shortMD, chunk.ChunkConfig{ChunkSize: 500})
@@ -158,25 +166,7 @@ func TestMDChunkerShortContent(t *testing.T) {
 
 // --- einoChunker ---
 
-type mockEmbedder struct {
-	vectors [][]float64
-}
-
-func (m *mockEmbedder) EmbedStrings(ctx context.Context, texts []string) ([][]float64, error) {
-	if m.vectors != nil {
-		return m.vectors, nil
-	}
-	result := make([][]float64, len(texts))
-	for i, t := range texts {
-		v := make([]float64, 3)
-		for j := range v {
-			v[j] = float64(len(t)+i+j) / 100.0
-		}
-		result[i] = v
-	}
-	return result, nil
-}
-
+// TestEinoChunkerNilEmbedder 验证缺少向量模型时返回错误。
 func TestEinoChunkerNilEmbedder(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyEino)
 	_, err := chunker.Chunk(context.Background(), "test", chunk.ChunkConfig{})
@@ -186,8 +176,9 @@ func TestEinoChunkerNilEmbedder(t *testing.T) {
 	t.Logf("nil embedder error: %v", err)
 }
 
+// TestEinoChunkerWithMock 验证语义切块器能够使用模拟向量。
 func TestEinoChunkerWithMock(t *testing.T) {
-	mock := &mockEmbedder{}
+	mock := &model.MockEmbedder{}
 	chunker := chunk.NewEinoChunker(mock)
 	cfg := chunk.ChunkConfig{ChunkSize: 500, ChunkOverlap: 30}
 
@@ -211,8 +202,9 @@ func TestEinoChunkerWithMock(t *testing.T) {
 	t.Logf("EinoChunker OK: %d chunks", len(docs))
 }
 
+// TestEinoChunkerShortContent 验证短文本无需向量计算即可返回。
 func TestEinoChunkerShortContent(t *testing.T) {
-	mock := &mockEmbedder{}
+	mock := &model.MockEmbedder{}
 	chunker := chunk.NewEinoChunker(mock)
 	docs, err := chunker.Chunk(context.Background(), "short text", chunk.ChunkConfig{ChunkSize: 500})
 	tests.AssertNoErr(t, err, "EinoChunker short content")
@@ -221,8 +213,9 @@ func TestEinoChunkerShortContent(t *testing.T) {
 	}
 }
 
+// TestEinoChunkerEmpty 验证语义切块器处理空内容的行为。
 func TestEinoChunkerEmpty(t *testing.T) {
-	mock := &mockEmbedder{}
+	mock := &model.MockEmbedder{}
 	chunker := chunk.NewEinoChunker(mock)
 	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
 	tests.AssertNoErr(t, err, "EinoChunker empty")
@@ -231,9 +224,10 @@ func TestEinoChunkerEmpty(t *testing.T) {
 	}
 }
 
+// TestSplitSentences 验证中英文文本的分句结果。
 func TestSplitSentences(t *testing.T) {
-	mock := &mockEmbedder{
-		vectors: [][]float64{
+	mock := &model.MockEmbedder{
+		Vectors: [][]float64{
 			{1.0, 0.0, 0.0},
 			{1.0, 0.1, 0.0},
 			{0.0, 1.0, 0.0},
@@ -254,6 +248,7 @@ func TestSplitSentences(t *testing.T) {
 
 // --- hierarchicalChunker ---
 
+// TestHierarchicalChunker 验证分层切块器生成父子文档。
 func TestHierarchicalChunker(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	cfg := chunk.ChunkConfig{ChunkSize: 100, ChunkOverlap: 20}
@@ -291,6 +286,7 @@ func TestHierarchicalChunker(t *testing.T) {
 	t.Logf("HierarchicalChunker OK: %d parents + %d children = %d total", parents, children, len(docs))
 }
 
+// TestHierarchicalChunkerParentChildLink 验证父子块之间的元数据关联。
 func TestHierarchicalChunkerParentChildLink(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	cfg := chunk.ChunkConfig{ChunkSize: 100, ChunkOverlap: 0}
@@ -341,6 +337,7 @@ func TestHierarchicalChunkerParentChildLink(t *testing.T) {
 	t.Logf("parent-child links: %d parents, %d children", len(parentChildren), len(childParents))
 }
 
+// TestHierarchicalChunkerEmpty 验证分层切块器处理空内容的行为。
 func TestHierarchicalChunkerEmpty(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	docs, err := chunker.Chunk(context.Background(), "", chunk.ChunkConfig{})
@@ -350,6 +347,7 @@ func TestHierarchicalChunkerEmpty(t *testing.T) {
 	}
 }
 
+// TestHierarchicalChunkerShortContent 验证短内容只生成一个父块。
 func TestHierarchicalChunkerShortContent(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	docs, err := chunker.Chunk(context.Background(), shortMD, chunk.ChunkConfig{ChunkSize: 500})
@@ -363,6 +361,7 @@ func TestHierarchicalChunkerShortContent(t *testing.T) {
 	}
 }
 
+// TestHierarchicalChunkerChunkSizeRatio 验证父子块的尺寸比例。
 func TestHierarchicalChunkerChunkSizeRatio(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	cfg := chunk.ChunkConfig{ChunkSize: 150, ChunkOverlap: 0}
@@ -394,6 +393,7 @@ func TestHierarchicalChunkerChunkSizeRatio(t *testing.T) {
 
 // --- 策略分发 ---
 
+// TestNewChunkerStrategy 验证工厂函数返回正确的切块策略。
 func TestNewChunkerStrategy(t *testing.T) {
 	free := chunk.NewChunker(chunk.StrategyFree)
 	tests.AssertTrue(t, free != nil, "StrategyFree should return non-nil Chunker")
@@ -411,5 +411,5 @@ func TestNewChunkerStrategy(t *testing.T) {
 	tests.AssertTrue(t, def != nil, "unknown strategy should return non-nil Chunker")
 }
 
-// Ensure mockEmbedder implements embedding.Embedder
-var _ embedding.Embedder = (*mockEmbedder)(nil)
+// 确保模拟向量实现满足 Embedder 接口。
+var _ embedding.Embedder = (*model.MockEmbedder)(nil)

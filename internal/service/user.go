@@ -9,13 +9,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserService struct{}
+type UserService = model.UserService
+type UserListFilter = model.UserListFilter
+type UserListResult = model.UserListResult
 
+// NewUserService 创建并初始化对应的实例。
 func NewUserService() *UserService {
-	return &UserService{}
+	return &model.UserService{
+		CreateFunc:  create,
+		ListFunc:    list,
+		GetByIDFunc: getByID,
+		UpdateFunc:  update,
+		DeleteFunc:  deleteUser,
+	}
 }
 
-func (s *UserService) Create(name, password string, quota int64, remark string) (*model.User, error) {
+// create 创建用户并持久化到数据库。
+func create(name, password string, quota int64, remark string) (*model.User, error) {
 	hash, err := auth.Hash(password)
 	if err != nil {
 		return nil, err
@@ -34,25 +44,8 @@ func (s *UserService) Create(name, password string, quota int64, remark string) 
 	return &user, nil
 }
 
-type UserListFilter struct {
-	Name          string
-	Remark        string
-	QuotaMin      *int64
-	QuotaMax      *int64
-	CreatedAfter  *string
-	CreatedBefore *string
-	Sort          string
-	Order         string
-	Page          int
-	Size          int
-}
-
-type UserListResult struct {
-	Total int64
-	List  []*model.User
-}
-
-func (s *UserService) List(f UserListFilter) (*UserListResult, error) {
+// list 查询符合筛选条件的用户列表。
+func list(f model.UserListFilter) (*model.UserListResult, error) {
 	if f.Page < 1 {
 		f.Page = 1
 	}
@@ -61,7 +54,7 @@ func (s *UserService) List(f UserListFilter) (*UserListResult, error) {
 	}
 
 	db := database.DB.Model(&model.User{}).Where("is_deleted = 0")
-	db = s.applyFilters(db, f)
+	db = applyFilters(db, f)
 
 	if f.Sort == "" {
 		f.Sort = "id"
@@ -77,10 +70,11 @@ func (s *UserService) List(f UserListFilter) (*UserListResult, error) {
 	var users []*model.User
 	db.Offset((f.Page - 1) * f.Size).Limit(f.Size).Find(&users)
 
-	return &UserListResult{Total: total, List: users}, nil
+	return &model.UserListResult{Total: total, List: users}, nil
 }
 
-func (s *UserService) applyFilters(db *gorm.DB, f UserListFilter) *gorm.DB {
+// applyFilters 将用户筛选条件应用到数据库查询。
+func applyFilters(db *gorm.DB, f model.UserListFilter) *gorm.DB {
 	if f.Name != "" {
 		db = db.Where("name LIKE ?", "%"+f.Name+"%")
 	}
@@ -102,7 +96,8 @@ func (s *UserService) applyFilters(db *gorm.DB, f UserListFilter) *gorm.DB {
 	return db
 }
 
-func (s *UserService) GetByID(id int64, name string) (*model.User, error) {
+// getByID 根据编号和可选名称查询用户。
+func getByID(id int64, name string) (*model.User, error) {
 	db := database.DB.Model(&model.User{}).Where("is_deleted = 0")
 	if name != "" {
 		db = db.Where("name LIKE ?", "%"+name+"%")
@@ -114,7 +109,8 @@ func (s *UserService) GetByID(id int64, name string) (*model.User, error) {
 	return &user, nil
 }
 
-func (s *UserService) Update(id int64, updates map[string]any) (*model.User, error) {
+// update 更新指定用户并返回最新数据。
+func update(id int64, updates map[string]any) (*model.User, error) {
 	if pw, ok := updates["password"]; ok {
 		hash, err := auth.Hash(pw.(string))
 		if err != nil {
@@ -136,7 +132,8 @@ func (s *UserService) Update(id int64, updates map[string]any) (*model.User, err
 	return &user, nil
 }
 
-func (s *UserService) Delete(id int64) error {
+// deleteUser 对指定用户执行软删除。
+func deleteUser(id int64) error {
 	result := database.DB.Model(&model.User{}).Where("id = ? AND is_deleted = 0", id).
 		Update("is_deleted", 1)
 	if result.Error != nil {
