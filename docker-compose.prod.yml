@@ -1,0 +1,21 @@
+# 生产部署：make push 后由服务器 post-receive hook 执行
+# docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aisearch
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8081}:8081"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: prod
+    volumes:
+      - ./log:/app/log
+    extra_hosts:
+      # 容器内访问宿主机 MySQL/Redis（若数据库跑在宿主机上）
+      - "host.docker.internal:host-gateway"

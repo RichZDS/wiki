@@ -1,0 +1,39 @@
+#!/bin/bash
+# Git post-receive hook：检出代码、编译、重启 systemd 服务。
+# 由 setup-server.sh 安装到 bare 仓库 hooks/post-receive
+
+set -euo pipefail
+
+DEPLOY_DIR="/opt/aisearch"
+GIT_DIR="/var/git/aisearch.git"
+BRANCH="main"
+APP_NAME="aisearch"
+SERVICE_NAME="aisearch"
+
+export PATH="/usr/local/go/bin:/usr/bin:/bin:$PATH"
+
+log() {
+	echo "[deploy $(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+deploy_branch() {
+	log "checking out $BRANCH to $DEPLOY_DIR"
+	git --work-tree="$DEPLOY_DIR" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+
+	cd "$DEPLOY_DIR"
+
+	log "building $APP_NAME"
+	CGO_ENABLED=0 go build -ldflags="-s -w" -o "$APP_NAME" .
+
+	log "restarting $SERVICE_NAME"
+	sudo systemctl restart "$SERVICE_NAME"
+
+	log "deploy complete"
+	sudo systemctl --no-pager status "$SERVICE_NAME" | head -5
+}
+
+while read -r _ newrev refname; do
+	if [[ "$refname" == "refs/heads/$BRANCH" ]]; then
+		deploy_branch
+	fi
+done

@@ -10,6 +10,7 @@ import (
 	"aisearch/pkg/logger"
 )
 
+// 时间轮
 const ScanInterval = 100 * time.Millisecond
 
 type Handler = model.JobHandler

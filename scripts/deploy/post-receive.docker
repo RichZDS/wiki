@@ -1,0 +1,41 @@
+#!/bin/bash
+# Git post-receive hook（Docker 版）：检出代码、构建镜像、重启容器。
+# 由 setup-server-docker.sh 安装为 bare 仓库 hooks/post-receive
+
+set -euo pipefail
+
+DEPLOY_DIR="/opt/aisearch"
+GIT_DIR="/var/git/aisearch.git"
+BRANCH="main"
+COMPOSE_FILE="docker-compose.prod.yml"
+
+log() {
+	echo "[deploy $(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+deploy_branch() {
+	log "checking out $BRANCH to $DEPLOY_DIR"
+	git --work-tree="$DEPLOY_DIR" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+
+	cd "$DEPLOY_DIR"
+
+	if [[ ! -f "$COMPOSE_FILE" ]]; then
+		log "ERROR: $COMPOSE_FILE not found"
+		exit 1
+	fi
+
+	log "building and restarting containers"
+	docker compose -f "$COMPOSE_FILE" up -d --build --remove-orphans
+
+	log "pruning dangling images"
+	docker image prune -f >/dev/null 2>&1 || true
+
+	log "deploy complete"
+	docker compose -f "$COMPOSE_FILE" ps
+}
+
+while read -r _ newrev refname; do
+	if [[ "$refname" == "refs/heads/$BRANCH" ]]; then
+		deploy_branch
+	fi
+done

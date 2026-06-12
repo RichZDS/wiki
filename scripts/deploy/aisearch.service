@@ -1,0 +1,24 @@
+[Unit]
+Description=aisearch wiki API
+After=network.target mysql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aisearch
+Group=aisearch
+WorkingDirectory=/opt/aisearch
+ExecStart=/opt/aisearch/aisearch prod
+Restart=on-failure
+RestartSec=5
+
+# 生产环境变量（敏感项写在 /opt/aisearch/.env，不要提交到 git）
+EnvironmentFile=-/opt/aisearch/.env
+
+# 日志写入 /opt/aisearch/log/
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aisearch
+
+[Install]
+WantedBy=multi-user.target
