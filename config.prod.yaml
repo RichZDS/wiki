@@ -5,13 +5,18 @@ log:
   level: info
 
 mysql:
-  host: prod-db.example.com
-  user: prod_user
+  host: host.docker.internal
+  port: 3306
+  user: root
   password: ""
-  database: aisearch
+  database: wiki
+  charset: utf8mb4
   max_idle_conns: 20
   max_open_conns: 200
   conn_max_lifetime: 7200
 
 redis:
-  host: prod-redis.example.com
+  host: host.docker.internal
+  port: 6379
+  password: ""
+  db: 0

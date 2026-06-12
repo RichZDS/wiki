@@ -1,6 +1,8 @@
 # 多阶段构建：编译 Go 二进制并打包为最小运行镜像
 FROM golang:1.25-alpine AS builder
 
+ENV GOPROXY=https://goproxy.cn,direct
+
 WORKDIR /src
 
 COPY go.mod go.sum ./
