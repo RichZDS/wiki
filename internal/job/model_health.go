@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"wiki/internal/model"
+	"wiki/pkg/database"
 	"wiki/pkg/logger"
 	"wiki/pkg/utils"
 
@@ -20,7 +21,20 @@ import (
 const (
 	ModelHealthInterval = 5 * time.Minute
 	ModelProbeTimeout   = 15 * time.Second
+
+	modelFailReasonNotFound = "model not found"
 )
+
+type modelProvider struct {
+	baseURL   string
+	apiKeyEnv string
+}
+
+var defaultModelProviders = map[string]modelProvider{
+	"openai":   {baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY"},
+	"deepseek": {baseURL: "https://api.deepseek.com", apiKeyEnv: "DEEPSEEK_API_KEY"},
+	"minimax":  {baseURL: "https://api.minimax.chat", apiKeyEnv: "MINIMAX_API_KEY"},
+}
 
 type ModelChecker interface {
 	Check(context.Context) error
@@ -55,24 +69,29 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 			return errors.Join(append(updateErrors, err)...)
 		}
 
-		available := checkModel(ctx, current.ModelName, checkers, timeout)
+		available, failReason := checkModel(ctx, current.ModelName, checkers, timeout)
 		if err := ctx.Err(); err != nil {
 			return errors.Join(append(updateErrors, err)...)
 		}
 
 		wanted := int8(0)
+		nextFailReason := failReason
 		if available {
 			wanted = 1
+			nextFailReason = ""
 		}
 
-		if current.IsUsed == wanted {
+		if current.IsUsed == wanted && current.FailReason == nextFailReason {
 			continue
 		}
 
 		result := db.WithContext(ctx).
 			Model(&model.AIModel{}).
 			Where("id = ?", current.ID).
-			Update("is_used", wanted)
+			Updates(map[string]any{
+				"is_used":     wanted,
+				"fail_reason": nextFailReason,
+			})
 		if result.Error != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("update model %q: %w", current.ModelName, result.Error))
 			continue
@@ -85,21 +104,23 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 }
 
 // checkModel 调用指定模型的健康检查器。
-func checkModel(ctx context.Context, modelName string, checkers map[string]ModelChecker, timeout time.Duration) bool {
+func checkModel(ctx context.Context, modelName string, checkers map[string]ModelChecker, timeout time.Duration) (bool, string) {
 	checker, ok := checkers[modelName]
 	if !ok {
+		reason := modelFailReasonNotFound
 		logger.GetLogger().Printf("[JOB] model %s has no registered health checker", modelName)
-		return false
+		return false, reason
 	}
 
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if err := checker.Check(probeCtx); err != nil {
+		reason := err.Error()
 		logger.GetLogger().Printf("[JOB] model %s health check failed: %v", modelName, err)
-		return false
+		return false, reason
 	}
-	return true
+	return true, ""
 }
 
 // checkCompatibleModel 调用兼容 OpenAI 协议的接口进行探测。
@@ -125,29 +146,69 @@ func checkCompatibleModel(ctx context.Context, baseURL, apiKey, modelName string
 	return nil
 }
 
-// DefaultModelCheckers 负责处理当前模块中的对应业务逻辑。
+// DefaultModelCheckers 从 ai_model 表读取模型并构建健康检查器映射。
 func DefaultModelCheckers() map[string]ModelChecker {
-	openAIModel := envOrDefault("OPENAI_MODEL_ID", "gpt-4o")
-	deepSeekModel := envOrDefault("DEEPSEEK_MODEL_ID", "deepseek-v4-pro")
+	checkers := make(map[string]ModelChecker)
 
-	return map[string]ModelChecker{
-		openAIModel: &model.CompatibleModelChecker{
-			CheckFunc: func(ctx context.Context) error {
-				return checkCompatibleModel(ctx, "https://api.openai.com/v1", os.Getenv("OPENAI_API_KEY"), openAIModel)
-			},
-		},
-		deepSeekModel: &model.CompatibleModelChecker{
-			CheckFunc: func(ctx context.Context) error {
-				return checkCompatibleModel(ctx, "https://api.deepseek.com", os.Getenv("DEEPSEEK_API_KEY"), deepSeekModel)
-			},
+	var models []model.AIModel
+	ctx := context.Background()
+	if err := database.DB.WithContext(ctx).Find(&models).Error; err != nil {
+		logger.GetLogger().Printf("[JOB] load ai_model failed: %v", err)
+		return checkers
+	}
+
+	for _, current := range models {
+		provider, ok := defaultModelProviders[current.ModelName]
+		if !ok {
+			markModelUnavailable(ctx, current.ID, modelFailReasonNotFound)
+			continue
+		}
+
+		modelID := strings.TrimSpace(current.ModelId)
+		if modelID == "" {
+			markModelUnavailable(ctx, current.ID, modelFailReasonNotFound)
+			continue
+		}
+
+		checkers[current.ModelName] = newCompatibleModelChecker(database.DB, provider, current.ID, modelID)
+	}
+
+	return checkers
+}
+
+// resolveModelAPIKey 优先使用 ai_model.api_key，为空时回退到环境变量。
+func resolveModelAPIKey(ctx context.Context, db *gorm.DB, modelID int64, envKey string) string {
+	if db != nil {
+		var record model.AIModel
+		if err := db.WithContext(ctx).Select("api_key").First(&record, modelID).Error; err == nil {
+			if key := strings.TrimSpace(record.APIKey); key != "" {
+				return key
+			}
+		}
+	}
+	return strings.TrimSpace(os.Getenv(envKey))
+}
+
+// newCompatibleModelChecker 为指定 provider 创建基于 model_id 的健康检查器。
+func newCompatibleModelChecker(db *gorm.DB, provider modelProvider, recordID int64, modelID string) *model.CompatibleModelChecker {
+	return &model.CompatibleModelChecker{
+		CheckFunc: func(ctx context.Context) error {
+			apiKey := resolveModelAPIKey(ctx, db, recordID, provider.apiKeyEnv)
+			return checkCompatibleModel(ctx, provider.baseURL, apiKey, modelID)
 		},
 	}
 }
 
-// envOrDefault 负责处理当前模块中的对应业务逻辑。
-func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
-		return value
+// markModelUnavailable 将模型标记为不可用并记录失败原因。
+func markModelUnavailable(ctx context.Context, modelID int64, failReason string) {
+	result := database.DB.WithContext(ctx).
+		Model(&model.AIModel{}).
+		Where("id = ?", modelID).
+		Updates(map[string]any{
+			"is_used":       0,
+			"fail_reason": failReason,
+		})
+	if result.Error != nil {
+		logger.GetLogger().Printf("[JOB] mark model %d unavailable: %v", modelID, result.Error)
 	}
-	return fallback
 }

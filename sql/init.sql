@@ -13,9 +13,12 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 CREATE TABLE IF NOT EXISTS `ai_model` (
-    `id`         BIGINT       NOT NULL COMMENT '主键（雪花算法生成）',
-    `model_name` VARCHAR(128) NOT NULL COMMENT '模型名称',
-    `is_used`    TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否可用：0-不可用 1-可用',
+    `id`          BIGINT       NOT NULL COMMENT '主键（雪花算法生成）',
+    `model_name`  VARCHAR(128) NOT NULL COMMENT '模型名称',
+    `model_id`    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '模型 ID（API 调用用）',
+    `api_key`     VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'API 密钥，为空时回退环境变量',
+    `is_used`     TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否可用：0-不可用 1-可用',
+    `fail_reason` VARCHAR(512) NOT NULL DEFAULT '' COMMENT '不可用原因',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_model_name` (`model_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型状态表';
