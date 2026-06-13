@@ -1,10 +1,10 @@
 package service
 
 import (
-	"aisearch/internal/model"
-	"aisearch/pkg/auth"
-	"aisearch/pkg/database"
-	"aisearch/pkg/snowflake"
+	"wiki/internal/model"
+	"wiki/pkg/auth"
+	"wiki/pkg/database"
+	"wiki/pkg/snowflake"
 
 	"gorm.io/gorm"
 )

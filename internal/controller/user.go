@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"aisearch/internal/model"
-	"aisearch/internal/service"
-	"aisearch/pkg/response"
+	"wiki/internal/model"
+	"wiki/internal/service"
+	"wiki/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

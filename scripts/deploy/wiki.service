@@ -1,0 +1,24 @@
+[Unit]
+Description=wiki API
+After=network.target mysql.service redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wiki
+Group=wiki
+WorkingDirectory=/opt/wiki
+ExecStart=/opt/wiki/wiki prod
+Restart=on-failure
+RestartSec=5
+
+# ???????????? /opt/wiki/.env?????? git?
+EnvironmentFile=-/opt/wiki/.env
+
+# ???? /opt/wiki/log/
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=wiki
+
+[Install]
+WantedBy=multi-user.target

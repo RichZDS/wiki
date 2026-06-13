@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"aisearch/internal/model"
+	"wiki/internal/model"
 
 	"gopkg.in/yaml.v3"
 )

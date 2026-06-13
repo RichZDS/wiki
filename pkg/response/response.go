@@ -1,7 +1,7 @@
 package response
 
 import (
-	"aisearch/internal/model"
+	"wiki/internal/model"
 
 	"github.com/gin-gonic/gin"
 )

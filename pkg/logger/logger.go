@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"aisearch/internal/model"
+	"wiki/internal/model"
 )
 
 var Log *log.Logger

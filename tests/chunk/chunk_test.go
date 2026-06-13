@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"aisearch/internal/ai/chunk"
-	"aisearch/internal/ai/embedding"
-	"aisearch/internal/model"
+	"wiki/internal/ai/chunk"
+	"wiki/internal/ai/embedding"
+	"wiki/internal/model"
 
-	tests "aisearch/tests"
+	tests "wiki/tests"
 )
 
 // --- 共享测试数据 ---

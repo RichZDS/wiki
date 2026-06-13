@@ -8,8 +8,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"aisearch/internal/ai/embedding"
-	"aisearch/internal/model"
+	"wiki/internal/ai/embedding"
+	"wiki/internal/model"
 
 	"github.com/cloudwego/eino/schema"
 )

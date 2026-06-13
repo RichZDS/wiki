@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"aisearch/internal/model"
-	"aisearch/pkg/logger"
+	"wiki/internal/model"
+	"wiki/pkg/logger"
 )
 
 // 时间轮

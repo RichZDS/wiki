@@ -3,7 +3,7 @@ package middleware
 import (
 	"time"
 
-	"aisearch/pkg/logger"
+	"wiki/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 

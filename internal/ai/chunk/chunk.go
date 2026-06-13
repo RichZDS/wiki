@@ -19,7 +19,7 @@ import (
 	"context"
 	"fmt"
 
-	"aisearch/internal/model"
+	"wiki/internal/model"
 
 	"github.com/cloudwego/eino/schema"
 )

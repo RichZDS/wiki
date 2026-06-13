@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"aisearch/internal/model"
-	"aisearch/pkg/logger"
-	"aisearch/pkg/utils"
+	"wiki/internal/model"
+	"wiki/pkg/logger"
+	"wiki/pkg/utils"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/schema"

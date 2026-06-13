@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"aisearch/internal/model"
+	"wiki/internal/model"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/yuin/goldmark"

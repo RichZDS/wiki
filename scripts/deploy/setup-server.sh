@@ -4,10 +4,10 @@
 
 set -euo pipefail
 
-APP_USER="aisearch"
-APP_DIR="/opt/aisearch"
-GIT_DIR="/var/git/aisearch.git"
-SERVICE_NAME="aisearch"
+APP_USER="wiki"
+APP_DIR="/opt/wiki"
+GIT_DIR="/var/git/wiki.git"
+SERVICE_NAME="wiki"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ $EUID -ne 0 ]]; then
@@ -41,12 +41,12 @@ install -m 755 "$SCRIPT_DIR/post-receive" "$GIT_DIR/hooks/post-receive"
 chown -R "$APP_USER:$APP_USER" "$GIT_DIR"
 
 log "安装 systemd 服务"
-install -m 644 "$SCRIPT_DIR/aisearch.service" "/etc/systemd/system/$SERVICE_NAME.service"
+install -m 644 "$SCRIPT_DIR/wiki.service" "/etc/systemd/system/$SERVICE_NAME.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
 log "配置 sudoers：允许 $APP_USER 无密码重启服务"
-SUDOERS_FILE="/etc/sudoers.d/aisearch-deploy"
+SUDOERS_FILE="/etc/sudoers.d/wiki-deploy"
 cat > "$SUDOERS_FILE" <<EOF
 $APP_USER ALL=(root) NOPASSWD: /bin/systemctl restart $SERVICE_NAME, /bin/systemctl status $SERVICE_NAME
 EOF

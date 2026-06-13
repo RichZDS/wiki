@@ -1,10 +1,10 @@
 package router
 
 import (
-	"aisearch/internal/config"
-	"aisearch/internal/controller"
-	"aisearch/internal/middleware"
-	"aisearch/pkg/response"
+	"wiki/internal/config"
+	"wiki/internal/controller"
+	"wiki/internal/middleware"
+	"wiki/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )

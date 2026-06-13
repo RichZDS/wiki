@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-APP_USER="aisearch"
-APP_DIR="/opt/aisearch"
-GIT_DIR="/var/git/aisearch.git"
+APP_USER="wiki"
+APP_DIR="/opt/wiki"
+GIT_DIR="/var/git/wiki.git"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ $EUID -ne 0 ]]; then

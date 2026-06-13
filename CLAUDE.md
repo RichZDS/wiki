@@ -12,7 +12,7 @@ go run main.go
 go run main.go prod
 
 # 构建
-go build -o aisearch.exe .
+go build -o wiki.exe .
 
 # 运行所有测试
 go test ./tests/...
@@ -32,7 +32,7 @@ go test ./tests/chunk/ -run TestFreeChunker
 
 ## 项目概述
 
-- 模块名: `aisearch`
+- 模块名: `wiki`
 - Go 版本: 1.25
 - Web 框架: Gin
 - ORM: GORM (MySQL)

@@ -1,6 +1,6 @@
 server:
   port: 8080
-  app_name: aisearch
+  app_name: wiki
 
 log:
   level: debug

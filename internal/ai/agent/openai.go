@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	internalmodel "aisearch/internal/model"
-	"aisearch/pkg/utils"
+	internalmodel "wiki/internal/model"
+	"wiki/pkg/utils"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
 )

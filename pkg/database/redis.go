@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"aisearch/internal/config"
-	"aisearch/pkg/logger"
+	"wiki/internal/config"
+	"wiki/pkg/logger"
 
 	"github.com/redis/go-redis/v9"
 )

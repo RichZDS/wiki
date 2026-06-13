@@ -7,7 +7,7 @@ import (
 
 	"github.com/cloudwego/eino/adk/filesystem"
 
-	tests "aisearch/tests"
+	tests "wiki/tests"
 )
 
 // TestInMemoryBackendWriteRead 验证内存文件后端的写入和读取。

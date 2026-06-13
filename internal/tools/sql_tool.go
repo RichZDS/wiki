@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode"
 
-	"aisearch/internal/model"
-	"aisearch/pkg/database"
+	"wiki/internal/model"
+	"wiki/pkg/database"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"

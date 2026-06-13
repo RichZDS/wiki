@@ -1,12 +1,12 @@
 .PHONY: build run test clean push deploy-init deploy-status deploy-logs
 
-APP_NAME = aisearch
+APP_NAME = wiki
 BUILD_DIR = build
 
 # 部署配置，复制 .deploy.env.example 为 .deploy.env 后修改
 -include .deploy.env
 DEPLOY_HOST   ?= deploy@your-server.com
-DEPLOY_REPO   ?= /var/git/aisearch.git
+DEPLOY_REPO   ?= /var/git/wiki.git
 DEPLOY_BRANCH ?= main
 DEPLOY_REMOTE ?= deploy
 DEPLOY_MODE   ?= native
@@ -52,15 +52,15 @@ push: deploy-init
 # 查看服务器上服务状态
 deploy-status:
 ifeq ($(DEPLOY_MODE),docker)
-	ssh $(DEPLOY_HOST) "cd /opt/aisearch && docker compose -f docker-compose.prod.yml ps"
+	ssh $(DEPLOY_HOST) "cd /opt/wiki && docker compose -f docker-compose.prod.yml ps"
 else
-	ssh $(DEPLOY_HOST) "systemctl status aisearch --no-pager"
+	ssh $(DEPLOY_HOST) "systemctl status wiki --no-pager"
 endif
 
 # 查看服务器上最近日志
 deploy-logs:
 ifeq ($(DEPLOY_MODE),docker)
-	ssh $(DEPLOY_HOST) "cd /opt/aisearch && docker compose -f docker-compose.prod.yml logs --tail=50 app"
+	ssh $(DEPLOY_HOST) "cd /opt/wiki && docker compose -f docker-compose.prod.yml logs --tail=50 app"
 else
-	ssh $(DEPLOY_HOST) "journalctl -u aisearch -n 50 --no-pager"
+	ssh $(DEPLOY_HOST) "journalctl -u wiki -n 50 --no-pager"
 endif

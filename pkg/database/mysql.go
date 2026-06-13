@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"aisearch/internal/config"
-	"aisearch/internal/model"
-	"aisearch/pkg/logger"
+	"wiki/internal/config"
+	"wiki/internal/model"
+	"wiki/pkg/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

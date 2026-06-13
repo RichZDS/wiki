@@ -10,11 +10,11 @@ import (
 	"syscall"
 	"time"
 
-	"aisearch/internal/config"
-	"aisearch/internal/job"
-	"aisearch/internal/router"
-	"aisearch/pkg/database"
-	"aisearch/pkg/logger"
+	"wiki/internal/config"
+	"wiki/internal/job"
+	"wiki/internal/router"
+	"wiki/pkg/database"
+	"wiki/pkg/logger"
 )
 
 // main 初始化应用依赖并启动 HTTP 服务。

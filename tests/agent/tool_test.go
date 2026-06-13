@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"aisearch/internal/ai/agent"
-	"aisearch/internal/tools"
+	"wiki/internal/ai/agent"
+	"wiki/internal/tools"
 
 	"github.com/cloudwego/eino/components/tool"
 )

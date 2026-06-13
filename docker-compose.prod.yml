@@ -6,7 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aisearch
+    container_name: wiki
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8081}:8081"

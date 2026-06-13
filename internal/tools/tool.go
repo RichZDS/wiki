@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"aisearch/internal/model"
-	"aisearch/pkg/logger"
+	"wiki/internal/model"
+	"wiki/pkg/logger"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"

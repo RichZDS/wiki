@@ -4,11 +4,11 @@
 
 set -euo pipefail
 
-DEPLOY_DIR="/opt/aisearch"
-GIT_DIR="/var/git/aisearch.git"
+DEPLOY_DIR="/opt/wiki"
+GIT_DIR="/var/git/wiki.git"
 BRANCH="main"
-APP_NAME="aisearch"
-SERVICE_NAME="aisearch"
+APP_NAME="wiki"
+SERVICE_NAME="wiki"
 
 export PATH="/usr/local/go/bin:/usr/bin:/bin:$PATH"
 

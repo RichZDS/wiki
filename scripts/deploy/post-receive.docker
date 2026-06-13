@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-DEPLOY_DIR="/opt/aisearch"
-GIT_DIR="/var/git/aisearch.git"
+DEPLOY_DIR="/opt/wiki"
+GIT_DIR="/var/git/wiki.git"
 BRANCH="main"
 COMPOSE_FILE="docker-compose.prod.yml"
 

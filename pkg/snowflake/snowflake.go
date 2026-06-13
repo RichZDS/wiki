@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"aisearch/internal/model"
+	"wiki/internal/model"
 )
 
 const epoch = 1704038400000 // 2024-01-01 00:00:00 UTC in milliseconds

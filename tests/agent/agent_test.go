@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"aisearch/internal/ai/chunk"
+	"wiki/internal/ai/chunk"
 
 	"github.com/cloudwego/eino/schema"
 )
