@@ -6,7 +6,7 @@ log:
   level: debug
 
 mysql:
-  host: localhost
+  host: 43.142.166.108
   port: 3306
   user: root
   password: "12345678"
@@ -17,7 +17,7 @@ mysql:
   conn_max_lifetime: 3600
 
 redis:
-  host: localhost
+  host: 43.142.166.108
   port: 6379
-  password: ""
+  password: "1218Zhengyaqi!"
   db: 0

@@ -26,7 +26,7 @@ go test ./tests/tools/
 go test ./tests/chunk/ -run TestFreeChunker
 ```
 
-服务默认监听 `:8080`（开发）或 `:8081`（生产），可通过 `config.yaml` / `config.prod.yaml` 的 `server.port` 配置。
+服务默认监听 `:8080`（开发）或 `:8081`（生产），可通过 `manifest/config/config.yaml` / `manifest/config/config.prod.yaml` 的 `server.port` 配置。
 
 入口文件是项目根目录的 `main.go`，按顺序初始化：config → logger → MySQL → Redis → router → run。
 
@@ -199,11 +199,11 @@ DELETE /api/v1/users/:id    — 删除
 
 ## 配置文件
 
-- `config.yaml` — 开发环境配置
-- `config.prod.yaml` — 生产环境覆盖配置（仅覆盖差异字段）
+- `manifest/config/config.yaml` — 开发环境配置
+- `manifest/config/config.prod.yaml` — 生产环境覆盖配置（仅覆盖差异字段）
 - 敏感字段支持环境变量覆盖: `MYSQL_PASSWORD`、`REDIS_PASSWORD`
 - 环境选择: 通过命令行参数（`go run main.go prod`）或 `APP_ENV` 环境变量
-- 配置文件查找: 优先 `APP_CONFIG` 环境变量，否则从当前目录向上查找 `config.yaml`
+- 配置文件查找: 优先 `APP_CONFIG` 环境变量，否则从当前目录向上查找 `manifest/config/config.yaml`
 
 ## 日志
 

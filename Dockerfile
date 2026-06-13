@@ -19,7 +19,7 @@ RUN apk add --no-cache ca-certificates tzdata wget \
 WORKDIR /app
 
 COPY --from=builder /aisearch .
-COPY config.yaml config.prod.yaml ./
+COPY manifest/config/ ./manifest/config/
 
 RUN mkdir -p log && chown -R appuser:appuser /app
 

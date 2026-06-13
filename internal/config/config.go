@@ -15,19 +15,21 @@ type LogConfig = model.LogConfig
 type MySQLConfig = model.MySQLConfig
 type RedisConfig = model.RedisConfig
 
-// resolveConfigPath 从环境变量或上级目录中查找配置文件。
+// resolveConfigPath 从环境变量或上级目录的 manifest/config 中查找配置文件。
 func resolveConfigPath(filename string) string {
 	if p := os.Getenv("APP_CONFIG"); p != "" {
 		return p
 	}
 
+	defaultPath := filepath.Join("manifest", "config", filename)
+
 	dir, err := os.Getwd()
 	if err != nil {
-		return filename
+		return defaultPath
 	}
 
 	for {
-		candidate := filepath.Join(dir, filename)
+		candidate := filepath.Join(dir, defaultPath)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate
 		}
@@ -38,7 +40,7 @@ func resolveConfigPath(filename string) string {
 		dir = parent
 	}
 
-	return filename
+	return defaultPath
 }
 
 // Load 加载当前运行环境的完整配置。
@@ -51,7 +53,7 @@ func Load() Config {
 	cfg := mustLoadYAML(resolveConfigPath("config.yaml"))
 
 	if env == "prod" {
-		override := mustLoadYAML("config.prod.yaml")
+		override := mustLoadYAML(resolveConfigPath("config.prod.yaml"))
 		cfg = merge(cfg, override)
 	}
 
