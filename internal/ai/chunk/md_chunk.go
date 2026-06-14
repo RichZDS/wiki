@@ -8,41 +8,42 @@ import (
 	"wiki/internal/model"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
-	"github.com/yuin/goldmark/text"
 )
 
-// mdChunker 按元素分类 + 标题聚合方式切分 Markdown（对应 Unstructured.io chunk_by_title 思路）。
+// mdChunker 按 Markdown 标题层级切分文档（参照 Eino Header Splitter 思路）。
 //
-// 核心步骤：
-//  1. 用 goldmark 解析 AST，收集元素列表（类型、标题路径、原始文本）
-//  2. 以标题为 section 边界，同 section 内贪心聚合至接近 chunkSize
-//  3. 代码块、列表、引用块等原子元素不被内部切分
-//  4. 超长 section 用 freeChunker 兜底
+// 与 goldmark AST 方案相比，本方案采用逐行扫描，更简单直接：
+//  1. 逐行扫描，识别标题边界（#、##、### 等）
+//  2. 代码块内（``` 或 ~~~ 围起）不切分
+//  3. 维护标题层级栈，为每个块记录 heading_path 元数据
+//  4. 超长段落用 freeChunker 兜底二次切分
 type mdChunker = model.MarkdownChunker
 
-// NewMDChunker 返回 Markdown 元素分类切块器。
+// NewMDChunker 返回 Markdown 标题切块器。
 func NewMDChunker() *mdChunker {
 	return &model.MarkdownChunker{ChunkFunc: mdChunk}
 }
 
-type mdElement = model.MarkdownElement
-type markdownChunk = model.MarkdownChunk
 type headingEntry = model.HeadingEntry
 type headingStack = model.HeadingStack
 
-// Chunk 执行 Markdown 元素分类切块。
+// mdSection 表示按标题切出的一个段落，包含内容和当前标题路径。
+type mdSection struct {
+	content     string
+	headingPath string
+}
+
+// mdChunk 执行 Markdown 标题切块。
 func mdChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
 	sanitizeConfig(&cfg)
 	if len(content) == 0 {
 		return nil, nil
 	}
 
-	elements := parseElements(content)
-	if len(elements) == 0 {
+	sections := splitByHeaders(content)
+	if len(sections) == 0 {
 		return []*schema.Document{{
-			ID:      fmt.Sprintf("chunk_0"),
+			ID:      "chunk_0",
 			Content: content,
 			MetaData: map[string]any{
 				metaKeyChunkIndex:    0,
@@ -52,238 +53,171 @@ func mdChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Do
 		}}, nil
 	}
 
-	chunks := aggregateElements(elements, cfg)
-	docs := make([]*schema.Document, len(chunks))
-	for i, c := range chunks {
-		docs[i] = markdownChunkToDocument(&c, i, len(chunks))
+	// 收集所有文档块，超长段落用 freeChunker 二次切分
+	var docs []*schema.Document
+	for _, sec := range sections {
+		if runeLen(sec.content) <= cfg.ChunkSize {
+			docs = append(docs, sectionToDoc(sec, len(docs)))
+		} else {
+			subDocs := splitOversizedSection(sec, cfg, len(docs))
+			docs = append(docs, subDocs...)
+		}
 	}
+
+	// 重新编号
+	for i, d := range docs {
+		d.ID = fmt.Sprintf("chunk_%d", i)
+		d.MetaData[metaKeyChunkIndex] = i
+		d.MetaData[metaKeyTotalChunks] = len(docs)
+	}
+
 	return docs, nil
 }
 
-// parseElements 用 goldmark 解析 Markdown，收集所有可切块元素。
-func parseElements(content string) []mdElement {
-	source := []byte(content)
-	parser := goldmark.DefaultParser()
-	root := parser.Parse(text.NewReader(source))
+// splitByHeaders 逐行扫描，在标题边界处切分文档。
+//
+// 参照 Eino Header Splitter 的 splitText 算法：
+//  - 维护 currentLines 累积当前段落的所有行
+//  - 遇到标题时 flush 当前段落，更新标题层级栈
+//  - 代码块内部不触发 flush
+func splitByHeaders(text string) []mdSection {
+	var sections []mdSection
+	stack := newHeadingStack()
+	var currentLines []string
+	inCodeBlock := false
+	var fence string
 
-	var elements []mdElement
-	headingStack := newHeadingStack()
+	lines := strings.Split(text, "\n")
 
-	ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if !entering {
-			return ast.WalkContinue, nil
+	for _, rawLine := range lines {
+		line := strings.TrimRight(rawLine, "\r")
+		trimmed := strings.TrimSpace(line)
+
+		// 空行直接追加
+		if trimmed == "" {
+			currentLines = append(currentLines, line)
+			continue
 		}
 
-		switch n.Kind() {
-		case ast.KindHeading:
-			h := n.(*ast.Heading)
-			pushHeading(headingStack, headingEntry{
-				Text:  extractText(source, n),
-				Level: h.Level,
-			})
-
-		case ast.KindParagraph:
-			if n.Parent() != nil && n.Parent().Kind() == ast.KindListItem {
-				return ast.WalkContinue, nil
+		// 代码块边界检测
+		if !inCodeBlock {
+			if isFenceStart(trimmed) {
+				inCodeBlock = true
+				fence = detectFence(trimmed)
 			}
-			elements = append(elements, mdElement{
-				Type:        "paragraph",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     linesToString(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
-
-		case ast.KindFencedCodeBlock:
-			elements = append(elements, mdElement{
-				Type:        "code_block",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     rawSegment(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
-
-		case ast.KindList:
-			elements = append(elements, mdElement{
-				Type:        "list",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     rawSegment(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
-
-		case ast.KindBlockquote:
-			elements = append(elements, mdElement{
-				Type:        "blockquote",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     rawSegment(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
-
-		case ast.KindThematicBreak:
-			elements = append(elements, mdElement{
-				Type:        "thematic_break",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     rawSegment(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
-
-		case ast.KindHTMLBlock:
-			elements = append(elements, mdElement{
-				Type:        "html_block",
-				HeadingPath: headingStackPath(headingStack),
-				Content:     rawSegment(source, n),
-				Level:       headingStackCurrentLevel(headingStack),
-			})
+		} else {
+			if strings.HasPrefix(trimmed, fence) {
+				inCodeBlock = false
+				fence = ""
+			}
 		}
-		return ast.WalkContinue, nil
-	})
 
-	return elements
+		// 代码块内直接追加，不做切分
+		if inCodeBlock {
+			currentLines = append(currentLines, line)
+			continue
+		}
+
+		// 检查是否为新标题
+		level, headingText := parseHeading(trimmed)
+		if level > 0 {
+			// flush 当前累积的段落
+			if len(currentLines) > 0 {
+				sections = append(sections, mdSection{
+					content:     strings.Join(currentLines, "\n"),
+					headingPath: headingStackPath(stack),
+				})
+				currentLines = nil
+			}
+
+			// 更新标题层级栈：弹出同级或更低级标题
+			pushHeading(stack, headingEntry{Text: headingText, Level: level})
+			currentLines = append(currentLines, line)
+			continue
+		}
+
+		currentLines = append(currentLines, line)
+	}
+
+	// flush 末尾未切分的段落
+	if len(currentLines) > 0 {
+		sections = append(sections, mdSection{
+			content:     strings.Join(currentLines, "\n"),
+			headingPath: headingStackPath(stack),
+		})
+	}
+
+	return sections
 }
 
-// markdownChunkToDocument 将 Markdown 块转换为标准文档。
-func markdownChunkToDocument(c *markdownChunk, index, total int) *schema.Document {
+// parseHeading 解析标题行，返回标题级别和纯文本。
+// 仅当行以 # 开头且后面跟随空格时才视为标题。
+// 例如 "# Title" → (1, "Title")，"## Section" → (2, "Section")。
+func parseHeading(line string) (level int, text string) {
+	if !strings.HasPrefix(line, "#") {
+		return 0, ""
+	}
+	for _, ch := range line {
+		if ch == '#' {
+			level++
+		} else {
+			break
+		}
+	}
+	if level == 0 || level > 6 {
+		return 0, ""
+	}
+	// # 后必须跟空格或行结束
+	if len(line) > level && line[level] != ' ' {
+		return 0, ""
+	}
+	text = strings.TrimSpace(line[level:])
+	return level, text
+}
+
+// isFenceStart 判断行是否为代码块围栏起始（``` 或 ~~~）。
+func isFenceStart(line string) bool {
+	return strings.HasPrefix(line, "```") || strings.HasPrefix(line, "~~~")
+}
+
+// detectFence 返回围栏字符串（"```" 或 "~~~"）。
+func detectFence(line string) string {
+	if strings.HasPrefix(line, "```") {
+		return "```"
+	}
+	return "~~~"
+}
+
+// sectionToDoc 将标题段落转换为标准 Document。
+func sectionToDoc(sec mdSection, index int) *schema.Document {
 	return &schema.Document{
 		ID:      fmt.Sprintf("chunk_%d", index),
-		Content: c.Content,
+		Content: sec.content,
 		MetaData: map[string]any{
 			metaKeyChunkIndex:    index,
-			metaKeyTotalChunks:   total,
-			metaKeyHeadingPath:   c.HeadingPath,
-			metaKeyElementTypes:  dedupeTypes(c.ElementTypes),
+			metaKeyHeadingPath:   sec.headingPath,
 			metaKeyChunkStrategy: "md",
 		},
 	}
 }
 
-// aggregateElements 将元素列表聚合为不超过 chunkSize 的块。
-func aggregateElements(elements []mdElement, cfg ChunkConfig) []markdownChunk {
-	if len(elements) == 0 {
-		return nil
-	}
-
-	var chunks []markdownChunk
-	var buf []mdElement
-	bufLen := 0
-	bufPath := ""
-	bufLevel := 0
-
-	flush := func() {
-		if len(buf) == 0 {
-			return
-		}
-		var sb strings.Builder
-		types := make([]string, 0, len(buf))
-		for _, e := range buf {
-			if sb.Len() > 0 {
-				sb.WriteString("\n\n")
-			}
-			sb.WriteString(e.Content)
-			types = append(types, e.Type)
-		}
-		chunks = append(chunks, markdownChunk{
-			Content:      sb.String(),
-			HeadingPath:  bufPath,
-			ElementTypes: types,
-			Level:        bufLevel,
-		})
-		buf = nil
-		bufLen = 0
-	}
-
-	for _, e := range elements {
-		el := len([]rune(e.Content))
-
-		// 标题路径变化作为 section 边界
-		if e.HeadingPath != bufPath && len(buf) > 0 {
-			flush()
-		}
-		if bufPath == "" || (e.HeadingPath != "" && e.HeadingPath != bufPath) {
-			bufPath = e.HeadingPath
-			bufLevel = e.Level
-		}
-
-		// 原子元素如果单元素就超长，强制截断
-		if isAtomic(e.Type) && el > cfg.ChunkSize {
-			flush()
-			chunks = append(chunks, splitAtomicElement(e, cfg.ChunkSize))
-			continue
-		}
-
-		// 超过容量时 flush
-		if bufLen+el > cfg.ChunkSize && len(buf) > 0 {
-			flush()
-		}
-
-		buf = append(buf, e)
-		bufLen += el
-	}
-
-	flush()
-
-	// 对仍然超长的块，用 freeChunker 兜底再切
-	return flattenOversized(chunks, cfg)
-}
-
-// isAtomic 判断元素类型是否应保持完整性、不被内部切分。
-func isAtomic(typ string) bool {
-	switch typ {
-	case "code_block", "list", "blockquote", "table", "html_block", "thematic_break":
-		return true
-	}
-	return false
-}
-
-// splitAtomicElement 将超长原子元素强制按 chunkSize 截断。
-func splitAtomicElement(e mdElement, chunkSize int) markdownChunk {
-	runes := []rune(e.Content)
-	if len(runes) <= chunkSize {
-		return markdownChunk{
-			Content:      e.Content,
-			HeadingPath:  e.HeadingPath,
-			ElementTypes: []string{e.Type},
-			Level:        e.Level,
-		}
-	}
-	return markdownChunk{
-		Content:      string(runes[:chunkSize]),
-		HeadingPath:  e.HeadingPath,
-		ElementTypes: []string{e.Type, "split_" + e.Type},
-		Level:        e.Level,
-	}
-}
-
-// flattenOversized 将聚合后仍然超长的块用 freeChunker 二次细分。
-func flattenOversized(chunks []markdownChunk, cfg ChunkConfig) []markdownChunk {
+// splitOversizedSection 将超长段落用 freeChunker 二次切分，
+// 并继承原段落的 heading_path 元数据。
+func splitOversizedSection(sec mdSection, cfg ChunkConfig, startIndex int) []*schema.Document {
 	fc := NewFreeChunker()
-	var result []markdownChunk
-	for _, ch := range chunks {
-		if len([]rune(ch.Content)) <= cfg.ChunkSize {
-			result = append(result, ch)
-			continue
+	subDocs, _ := fc.Chunk(context.Background(), sec.content, cfg)
+	for _, d := range subDocs {
+		if sec.headingPath != "" {
+			d.MetaData[metaKeyHeadingPath] = sec.headingPath
 		}
-		docs, _ := fc.Chunk(context.Background(), ch.Content, cfg)
-		for _, d := range docs {
-			result = append(result, markdownChunk{
-				Content:      d.Content,
-				HeadingPath:  ch.HeadingPath,
-				ElementTypes: ch.ElementTypes,
-				Level:        ch.Level,
-			})
-		}
+		d.MetaData[metaKeyChunkStrategy] = "md"
 	}
-	return result
+	return subDocs
 }
 
-// dedupeTypes 去重并保持顺序。
-func dedupeTypes(types []string) []string {
-	seen := make(map[string]bool, len(types))
-	var out []string
-	for _, t := range types {
-		if !seen[t] {
-			seen[t] = true
-			out = append(out, t)
-		}
-	}
-	return out
+// runeLen 返回字符串的字符数（而非字节数）。
+func runeLen(s string) int {
+	return len([]rune(s))
 }
 
 // --- heading stack ---
@@ -301,7 +235,7 @@ func pushHeading(s *headingStack, h headingEntry) {
 	s.Stack = append(s.Stack, h)
 }
 
-// headingStackPath 返回当前标题层级的完整路径。
+// headingStackPath 返回当前标题层级的完整路径（"> " 分隔）。
 func headingStackPath(s *headingStack) string {
 	if len(s.Stack) == 0 {
 		return ""
@@ -311,56 +245,4 @@ func headingStackPath(s *headingStack) string {
 		parts[i] = strings.TrimSpace(h.Text)
 	}
 	return strings.Join(parts, " > ")
-}
-
-// headingStackCurrentLevel 返回当前标题的层级。
-func headingStackCurrentLevel(s *headingStack) int {
-	if len(s.Stack) == 0 {
-		return 0
-	}
-	return s.Stack[len(s.Stack)-1].Level
-}
-
-// --- goldmark helpers ---
-
-// extractText 从 heading 节点的行中提取纯文本（去掉 # 标记）。
-func extractText(source []byte, n ast.Node) string {
-	lines := n.Lines()
-	if lines == nil || lines.Len() == 0 {
-		return ""
-	}
-	var buf strings.Builder
-	for i := 0; i < lines.Len(); i++ {
-		seg := lines.At(i)
-		buf.Write(source[seg.Start:seg.Stop])
-	}
-	raw := buf.String()
-	raw = strings.TrimLeft(raw, "#")
-	raw = strings.TrimSpace(raw)
-	return raw
-}
-
-// linesToString 从节点的 Lines() 中拼接完整文本。
-func linesToString(source []byte, n ast.Node) string {
-	lines := n.Lines()
-	if lines == nil || lines.Len() == 0 {
-		return ""
-	}
-	var buf strings.Builder
-	for i := 0; i < lines.Len(); i++ {
-		seg := lines.At(i)
-		buf.Write(source[seg.Start:seg.Stop])
-	}
-	return buf.String()
-}
-
-// rawSegment 从原始 source 中截取节点对应的原始 Markdown 文本。
-func rawSegment(source []byte, n ast.Node) string {
-	lines := n.Lines()
-	if lines == nil || lines.Len() == 0 {
-		return ""
-	}
-	first := lines.At(0)
-	last := lines.At(lines.Len() - 1)
-	return string(source[first.Start:last.Stop])
 }

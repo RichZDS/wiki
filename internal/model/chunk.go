@@ -48,20 +48,6 @@ func (c *HierarchicalChunker) Chunk(ctx context.Context, content string, cfg Chu
 	return c.ChunkFunc(ctx, content, cfg)
 }
 
-type MarkdownElement struct {
-	Type        string
-	HeadingPath string
-	Content     string
-	Level       int
-}
-
-type MarkdownChunk struct {
-	Content      string
-	HeadingPath  string
-	ElementTypes []string
-	Level        int
-}
-
 type HeadingEntry struct {
 	Text  string
 	Level int

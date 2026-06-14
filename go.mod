@@ -4,10 +4,11 @@ go 1.25.0
 
 require (
 	github.com/cloudwego/eino v0.9.0-beta.1
+	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.2
+	github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260612103359-5b10d0299532
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/gin-gonic/gin v1.12.0
 	github.com/redis/go-redis/v9 v9.19.0
-	github.com/yuin/goldmark v1.8.2
 	golang.org/x/crypto v0.51.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/mysql v1.6.0
@@ -41,10 +42,11 @@ require (
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.1.5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -58,14 +60,18 @@ require (
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
+	github.com/volcengine/volc-sdk-golang v1.0.23 // indirect
+	github.com/volcengine/volcengine-go-sdk v1.2.30 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.6.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/arch v0.27.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
