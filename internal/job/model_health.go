@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 	"wiki/pkg/database"
 	"wiki/pkg/logger"
 	"wiki/pkg/utils"
@@ -16,13 +17,6 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/schema"
 	"gorm.io/gorm"
-)
-
-const (
-	ModelHealthInterval = 5 * time.Minute
-	ModelProbeTimeout   = 15 * time.Second
-
-	modelFailReasonNotFound = "model not found"
 )
 
 type modelProvider struct {
@@ -47,7 +41,7 @@ type compatibleModelChecker = model.CompatibleModelChecker
 func NewModelHealthTask(db *gorm.DB, checkers map[string]ModelChecker) *ModelHealthTask {
 	return &model.ModelHealthTask{
 		RunFunc: func(ctx context.Context) error {
-			return runModelHealth(ctx, db, checkers, ModelProbeTimeout)
+			return runModelHealth(ctx, db, checkers, consts.ModelProbeTimeout)
 		},
 	}
 }
@@ -58,8 +52,8 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 		return errors.New("model health database is nil")
 	}
 
-	var models []model.AIModel
-	if err := db.WithContext(ctx).Find(&models).Error; err != nil {
+	models, err := model.ListAllAIModels(ctx, db)
+	if err != nil {
 		return fmt.Errorf("list models: %w", err)
 	}
 
@@ -85,15 +79,8 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 			continue
 		}
 
-		result := db.WithContext(ctx).
-			Model(&model.AIModel{}).
-			Where("id = ?", current.ID).
-			Updates(map[string]any{
-				"is_used":     wanted,
-				"fail_reason": nextFailReason,
-			})
-		if result.Error != nil {
-			updateErrors = append(updateErrors, fmt.Errorf("update model %q: %w", current.ModelName, result.Error))
+		if err := model.UpdateAIModelStatus(ctx, db, current.ID, wanted, nextFailReason); err != nil {
+			updateErrors = append(updateErrors, fmt.Errorf("update model %q: %w", current.ModelName, err))
 			continue
 		}
 
@@ -107,7 +94,7 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 func checkModel(ctx context.Context, modelName string, checkers map[string]ModelChecker, timeout time.Duration) (bool, string) {
 	checker, ok := checkers[modelName]
 	if !ok {
-		reason := modelFailReasonNotFound
+		reason := consts.ModelFailReasonNotFound
 		logger.GetLogger().Printf("[JOB] model %s has no registered health checker", modelName)
 		return false, reason
 	}
@@ -150,9 +137,9 @@ func checkCompatibleModel(ctx context.Context, baseURL, apiKey, modelName string
 func DefaultModelCheckers() map[string]ModelChecker {
 	checkers := make(map[string]ModelChecker)
 
-	var models []model.AIModel
 	ctx := context.Background()
-	if err := database.DB.WithContext(ctx).Find(&models).Error; err != nil {
+	models, err := model.ListAllAIModels(ctx, database.DB)
+	if err != nil {
 		logger.GetLogger().Printf("[JOB] load ai_model failed: %v", err)
 		return checkers
 	}
@@ -160,13 +147,13 @@ func DefaultModelCheckers() map[string]ModelChecker {
 	for _, current := range models {
 		provider, ok := defaultModelProviders[current.ModelName]
 		if !ok {
-			markModelUnavailable(ctx, current.ID, modelFailReasonNotFound)
+			markModelUnavailable(ctx, current.ID, consts.ModelFailReasonNotFound)
 			continue
 		}
 
 		modelID := strings.TrimSpace(current.ModelId)
 		if modelID == "" {
-			markModelUnavailable(ctx, current.ID, modelFailReasonNotFound)
+			markModelUnavailable(ctx, current.ID, consts.ModelFailReasonNotFound)
 			continue
 		}
 
@@ -177,12 +164,11 @@ func DefaultModelCheckers() map[string]ModelChecker {
 }
 
 // resolveModelAPIKey 优先使用 ai_model.api_key，为空时回退到环境变量。
-func resolveModelAPIKey(ctx context.Context, db *gorm.DB, modelID int64, envKey string) string {
+func resolveModelAPIKey(ctx context.Context, db *gorm.DB, id int64, envKey string) string {
 	if db != nil {
-		var record model.AIModel
-		if err := db.WithContext(ctx).Select("api_key").First(&record, modelID).Error; err == nil {
-			if key := strings.TrimSpace(record.APIKey); key != "" {
-				return key
+		if key, err := model.GetAIModelAPIKey(ctx, db, id); err == nil {
+			if k := strings.TrimSpace(key); k != "" {
+				return k
 			}
 		}
 	}
@@ -200,15 +186,8 @@ func newCompatibleModelChecker(db *gorm.DB, provider modelProvider, recordID int
 }
 
 // markModelUnavailable 将模型标记为不可用并记录失败原因。
-func markModelUnavailable(ctx context.Context, modelID int64, failReason string) {
-	result := database.DB.WithContext(ctx).
-		Model(&model.AIModel{}).
-		Where("id = ?", modelID).
-		Updates(map[string]any{
-			"is_used":       0,
-			"fail_reason": failReason,
-		})
-	if result.Error != nil {
-		logger.GetLogger().Printf("[JOB] mark model %d unavailable: %v", modelID, result.Error)
+func markModelUnavailable(ctx context.Context, id int64, failReason string) {
+	if err := model.UpdateAIModelStatus(ctx, database.DB, id, 0, failReason); err != nil {
+		logger.GetLogger().Printf("[JOB] mark model %d unavailable: %v", id, err)
 	}
 }

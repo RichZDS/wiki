@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 
 	"gorm.io/gorm"
 )
@@ -27,7 +28,7 @@ func NewDefaultJobGroup(db *gorm.DB) *JobGroup {
 		jobs: []JobDef{
 			{
 				Name:     "model-health-check",
-				Interval: ModelHealthInterval,
+				Interval: consts.ModelHealthInterval,
 				Handler:  NewModelHealthTask(db, DefaultModelCheckers()).Run,
 			},
 			// 添加新的任务到这里

@@ -3,9 +3,9 @@ package agent
 import (
 	"context"
 	"log"
-	"os"
 
 	internalmodel "wiki/internal/model"
+	"wiki/pkg/database"
 	"wiki/pkg/utils"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
@@ -15,14 +15,20 @@ type OpenAIAgent = internalmodel.OpenAIAgent
 
 // NewOpenAIAgent 创建并初始化对应的实例。
 func NewOpenAIAgent(ctx context.Context) *OpenAIAgent {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY is not set")
+	// 从 ai_model 表读取 OpenAI 模型配置
+	aimodel, err := internalmodel.GetAIModelByName(ctx, database.DB, "openai")
+	if err != nil {
+		log.Fatalf("failed to find ai_model 'openai': %v", err)
 	}
 
-	modelID := os.Getenv("OPENAI_MODEL_ID")
+	apiKey := aimodel.APIKey
+	if apiKey == "" {
+		log.Fatal("api_key for openai is not configured")
+	}
+
+	modelID := aimodel.ModelId
 	if modelID == "" {
-		modelID = "gpt-4o"
+		log.Fatal("model_id for openai is not configured")
 	}
 
 	m, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{

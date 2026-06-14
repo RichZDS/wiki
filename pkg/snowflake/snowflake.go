@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 )
-
-const epoch = 1704038400000 // 2024-01-01 00:00:00 UTC in milliseconds
 
 type Generator = model.SnowflakeGenerator
 
@@ -54,5 +53,5 @@ func next(g *model.SnowflakeGenerator) int64 {
 
 	g.LastTs = ts
 
-	return (ts-epoch)<<22 | g.WorkerID<<12 | g.Sequence
+	return (ts-consts.Epoch)<<22 | g.WorkerID<<12 | g.Sequence
 }

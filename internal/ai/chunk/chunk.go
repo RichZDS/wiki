@@ -20,22 +20,20 @@ import (
 	"fmt"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 
 	"github.com/cloudwego/eino/schema"
 )
 
 // Strategy 切块策略枚举，决定底层使用哪种分块算法。
-type Strategy string
+type Strategy = consts.Strategy
 
+// 导出切块策略枚举值。
 const (
-	// StrategyFree 自由切块 — 按分隔符优先级递归分割，适合纯文本与日志。
-	StrategyFree Strategy = "free"
-	// StrategyMD Markdown 切块 — 解析 AST 按标题层级分割，保留 heading 路径元数据。
-	StrategyMD Strategy = "md"
-	// StrategyEino 语义切块 — 通过 Eino EmbeddingModel 在低相似度边界处切分。
-	StrategyEino Strategy = "eino"
-	// StrategyHierarchical 上下文感知分层切块 — 两层父子结构，小子块精确检索，大父块提供上下文。
-	StrategyHierarchical Strategy = "hierarchical"
+	StrategyFree         = consts.StrategyFree
+	StrategyMD           = consts.StrategyMD
+	StrategyEino         = consts.StrategyEino
+	StrategyHierarchical = consts.StrategyHierarchical
 )
 
 // ChunkConfig 切块参数，由调用方根据文档类型和下游模型窗口大小进行调参。
@@ -79,17 +77,17 @@ func NewChunker(strategy Strategy) Chunker {
 	}
 }
 
-// 写入 schema.Document.MetaData 时使用的键名。
-const (
-	metaKeyChunkIndex    = "chunk_index"     // 当前块序号，0-based
-	metaKeyTotalChunks   = "chunk_total"     // 该文档被切分的总块数
-	metaKeyHeadingPath   = "heading_path"    // 标题路径，如 "Chapter 1 > Section 1.1"
-	metaKeyElementTypes  = "element_types"   // 块内包含的元素类型列表
-	metaKeyChunkStrategy = "chunk_strategy"  // 生成该块的策略名
-	metaKeyChunkRole     = "chunk_role"      // 分层切块中的角色: "parent" / "child"
-	metaKeyParentContent = "parent_content"  // 父块完整文本（子块用）
-	metaKeyParentChunkID = "parent_chunk_id" // 父块 ID（子块用）
-	metaKeyChildChunkIDs = "child_chunk_ids" // 子块 ID 列表（父块用）
+// 以下为 schema.Document.MetaData 写入时的键名引用。
+var (
+	metaKeyChunkIndex    = consts.MetaKeyChunkIndex
+	metaKeyTotalChunks   = consts.MetaKeyTotalChunks
+	metaKeyHeadingPath   = consts.MetaKeyHeadingPath
+	metaKeyElementTypes  = consts.MetaKeyElementTypes
+	metaKeyChunkStrategy = consts.MetaKeyChunkStrategy
+	metaKeyChunkRole     = consts.MetaKeyChunkRole
+	metaKeyParentContent = consts.MetaKeyParentContent
+	metaKeyParentChunkID = consts.MetaKeyParentChunkID
+	metaKeyChildChunkIDs = consts.MetaKeyChildChunkIDs
 )
 
 // newDocument 构造一个带完整元数据的 Document 切片。

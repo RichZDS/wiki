@@ -38,7 +38,7 @@ func create(name, password string, quota int64, remark string) (*model.User, err
 		Quota:    quota,
 		Remark:   remark,
 	}
-	if err := database.DB.Create(&user).Error; err != nil {
+	if err := model.InsertUser(database.DB, &user); err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -53,60 +53,22 @@ func list(f model.UserListFilter) (*model.UserListResult, error) {
 		f.Size = 20
 	}
 
-	db := database.DB.Model(&model.User{}).Where("is_deleted = 0")
-	db = applyFilters(db, f)
-
-	if f.Sort == "" {
-		f.Sort = "id"
+	total, err := model.CountUsers(database.DB, f)
+	if err != nil {
+		return nil, err
 	}
-	if f.Order != "asc" {
-		f.Order = "desc"
+
+	users, err := model.ListUsers(database.DB, f)
+	if err != nil {
+		return nil, err
 	}
-	db = db.Order(f.Sort + " " + f.Order)
-
-	var total int64
-	db.Count(&total)
-
-	var users []*model.User
-	db.Offset((f.Page - 1) * f.Size).Limit(f.Size).Find(&users)
 
 	return &model.UserListResult{Total: total, List: users}, nil
 }
 
-// applyFilters 将用户筛选条件应用到数据库查询。
-func applyFilters(db *gorm.DB, f model.UserListFilter) *gorm.DB {
-	if f.Name != "" {
-		db = db.Where("name LIKE ?", "%"+f.Name+"%")
-	}
-	if f.Remark != "" {
-		db = db.Where("remark LIKE ?", "%"+f.Remark+"%")
-	}
-	if f.QuotaMin != nil {
-		db = db.Where("quota >= ?", *f.QuotaMin)
-	}
-	if f.QuotaMax != nil {
-		db = db.Where("quota <= ?", *f.QuotaMax)
-	}
-	if f.CreatedAfter != nil {
-		db = db.Where("created_at >= ?", *f.CreatedAfter)
-	}
-	if f.CreatedBefore != nil {
-		db = db.Where("created_at <= ?", *f.CreatedBefore)
-	}
-	return db
-}
-
 // getByID 根据编号和可选名称查询用户。
 func getByID(id int64, name string) (*model.User, error) {
-	db := database.DB.Model(&model.User{}).Where("is_deleted = 0")
-	if name != "" {
-		db = db.Where("name LIKE ?", "%"+name+"%")
-	}
-	var user model.User
-	if err := db.Where("id = ?", id).First(&user).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
+	return model.GetUserByID(database.DB, id, name)
 }
 
 // update 更新指定用户并返回最新数据。
@@ -119,27 +81,24 @@ func update(id int64, updates map[string]any) (*model.User, error) {
 		updates["password"] = hash
 	}
 
-	result := database.DB.Model(&model.User{}).Where("id = ? AND is_deleted = 0", id).Updates(updates)
-	if result.Error != nil {
-		return nil, result.Error
+	affected, err := model.UpdateUser(database.DB, id, updates)
+	if err != nil {
+		return nil, err
 	}
-	if result.RowsAffected == 0 {
+	if affected == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
 
-	var user model.User
-	database.DB.Where("id = ?", id).First(&user)
-	return &user, nil
+	return model.RefreshUser(database.DB, id)
 }
 
 // deleteUser 对指定用户执行软删除。
 func deleteUser(id int64) error {
-	result := database.DB.Model(&model.User{}).Where("id = ? AND is_deleted = 0", id).
-		Update("is_deleted", 1)
-	if result.Error != nil {
-		return result.Error
+	affected, err := model.SoftDeleteUser(database.DB, id)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
+	if affected == 0 {
 		return gorm.ErrRecordNotFound
 	}
 	return nil

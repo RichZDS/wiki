@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -24,8 +25,6 @@ func NewHierarchicalChunker() *hierarchicalChunker {
 	return &model.HierarchicalChunker{ChunkFunc: hierarchicalChunk}
 }
 
-const parentSizeMultiplier = 3
-
 // Chunk 执行分层切块。
 func hierarchicalChunk(ctx context.Context, content string, cfg ChunkConfig) ([]*schema.Document, error) {
 	sanitizeConfig(&cfg)
@@ -42,7 +41,7 @@ func hierarchicalChunk(ctx context.Context, content string, cfg ChunkConfig) ([]
 
 	// 第一层：父级切块（大粒度）
 	parentCfg := cfg
-	parentCfg.ChunkSize = cfg.ChunkSize * parentSizeMultiplier
+	parentCfg.ChunkSize = cfg.ChunkSize * consts.ParentSizeMultiplier
 	parentCfg.ChunkOverlap = 0 // 父级不需要 overlap
 	parentDocs, err := mdChunk(ctx, content, parentCfg)
 	if err != nil {

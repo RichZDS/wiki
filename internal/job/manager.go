@@ -7,11 +7,9 @@ import (
 	"time"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 	"wiki/pkg/logger"
 )
-
-// 时间轮
-const ScanInterval = 100 * time.Millisecond
 
 type Handler = model.JobHandler
 type Manager = model.JobManager
@@ -80,7 +78,7 @@ func schedule(state *model.JobManagerState, ctx context.Context) {
 	}
 	runDue(state, ctx, time.Now())
 
-	ticker := time.NewTicker(ScanInterval)
+	ticker := time.NewTicker(consts.ScanInterval)
 	defer ticker.Stop()
 
 	for {

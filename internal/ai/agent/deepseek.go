@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 
 	internalmodel "wiki/internal/model"
+	"wiki/internal/redis"
+	"wiki/pkg/database"
 	"wiki/pkg/logger"
 	"wiki/pkg/utils"
 
@@ -50,20 +51,8 @@ func NewDeepSeekAgentWithConfig(ctx context.Context, cfg *DeepSeekConfig) *DeepS
 		cfg = &DeepSeekConfig{}
 	}
 
-	// API Key
-	apiKey := cfg.APIKey
-	if apiKey == "" {
-		apiKey = os.Getenv("DEEPSEEK_API_KEY")
-	}
-	if apiKey == "" {
-		log.Fatal("DEEPSEEK_API_KEY is not set")
-	}
-
-	// Model
-	modelID := cfg.Model
-	if modelID == "" {
-		modelID = "deepseek-v4-pro"
-	}
+	// 读取 DeepSeek 模型配置（优先 Redis 缓存，回退 MySQL 并写入缓存）
+	apiKey, modelID := loadDeepSeekConfig(ctx)
 
 	// MaxSteps
 	maxSteps := cfg.MaxSteps
@@ -302,4 +291,30 @@ func getToolInfos(state *internalmodel.DeepSeekAgentState, ctx context.Context) 
 		toolInfos = append(toolInfos, info)
 	}
 	return toolInfos, nil
+}
+
+// loadDeepSeekConfig 从 Redis 缓存或 MySQL 数据库加载 DeepSeek 模型配置。
+// 优先读取 Redis 缓存，未命中时查询 MySQL 并将结果写入 Redis（1 小时过期）。
+func loadDeepSeekConfig(ctx context.Context) (apiKey, modelID string) {
+	// 1. 尝试从 Redis 读取
+	if key, id, hit := redis.GetCachedAIModelConfig(ctx, "deepseek"); hit {
+		return key, id
+	}
+
+	// 2. Redis 未命中或不可用，从 MySQL 读取
+	aimodel, err := internalmodel.GetAIModelByName(ctx, database.DB, "deepseek")
+	if err != nil {
+		log.Fatalf("failed to find ai_model 'deepseek': %v", err)
+	}
+	if aimodel.APIKey == "" {
+		log.Fatal("api_key for deepseek is not configured")
+	}
+	if aimodel.ModelId == "" {
+		log.Fatal("model_id for deepseek is not configured")
+	}
+
+	// 3. 写入 Redis 缓存
+	redis.SetCachedAIModelConfig(ctx, "deepseek", aimodel.APIKey, aimodel.ModelId)
+
+	return aimodel.APIKey, aimodel.ModelId
 }

@@ -8,14 +8,13 @@ import (
 	"unicode"
 
 	"wiki/internal/model"
+	"wiki/internal/model/consts"
 	"wiki/pkg/database"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"gorm.io/gorm"
 )
-
-const maxSQLResultRows = 200
 
 type SQLInput = model.SQLInput
 type SQLResult = model.SQLResult
@@ -54,12 +53,7 @@ func executeSQL(ctx context.Context, db *gorm.DB, statement string) (SQLResult, 
 		return SQLResult{}, fmt.Errorf("database is not initialized")
 	}
 
-	sqlDB, err := db.DB()
-	if err != nil {
-		return SQLResult{}, fmt.Errorf("get database connection: %w", err)
-	}
-
-	rows, err := sqlDB.QueryContext(ctx, statement)
+	rows, err := db.Raw(statement).Rows()
 	if err != nil {
 		return SQLResult{}, fmt.Errorf("execute sql: %w", err)
 	}
@@ -81,7 +75,7 @@ func scanSQLRows(rows *sql.Rows) (SQLResult, error) {
 	}
 
 	for rows.Next() {
-		if result.RowCount >= maxSQLResultRows {
+		if result.RowCount >= consts.MaxSQLResultRows {
 			result.Truncated = true
 			break
 		}
