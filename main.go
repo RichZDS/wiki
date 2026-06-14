@@ -40,9 +40,9 @@ func main() {
 	defer cancel()
 
 	jobManager := job.NewManager()
-	modelHealthTask := job.NewModelHealthTask(database.DB, job.DefaultModelCheckers())
-	if err := jobManager.Register("model-health-check", job.ModelHealthInterval, modelHealthTask.Run); err != nil {
-		logger.Fatalf("register model health job: %v", err)
+	jobGroup := job.NewDefaultJobGroup(database.DB)
+	if err := jobGroup.RegisterAll(jobManager); err != nil {
+		logger.Fatalf("register jobs: %v", err)
 	}
 	jobManager.Start(ctx)
 

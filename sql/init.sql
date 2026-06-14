@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS `user` (
     UNIQUE KEY `uk_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
+
+-- AI 模型状态表
 CREATE TABLE IF NOT EXISTS `ai_model` (
     `id`          BIGINT       NOT NULL COMMENT '主键（雪花算法生成）',
     `model_name`  VARCHAR(128) NOT NULL COMMENT '模型名称',
