@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE & Editor
+.vscode
+.idea
+.editorconfig
+*.swp
+*.swo
+*~
+
+# Node (frontend)
+ui/node_modules
+ui/dist
+ui/.env
+ui/.env.*
+
+# Go build
+svr/build
+svr/log
+
+# Environment
+.env
+.env.*
+.deploy.env
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+LICENSE
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude / Cursor
+.claude
+.cursor
+CLAUDE.md

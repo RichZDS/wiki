@@ -2,7 +2,7 @@ server:
   port: 8080
   app_name: wiki
   allowed_origins:
-    - "http://localhost:94001"
+    - "http://localhost:8081"
 
 log:
   level: debug

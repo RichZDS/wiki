@@ -4,8 +4,8 @@ name: Docker 镜像构建与发布
 #
 # 触发时机：
 #   - push 到 main：构建并推送，标签含 latest、main、commit sha
-#   - 推送版本标签 v*.*.*：额外打上 semver 标签（如 v1.2.3 → 1.2.3）
-#   - PR：仅构建验证，不推送镜像
+#   - 推送版本标签 v*.*.*：额外打上 semver 标签（如 v1.2.3 → 1.2.3, 1.2）
+#   - PR：运行测试 + 构建验证，不推送镜像
 #   - workflow_dispatch：在 Actions 页面手动触发
 #
 # 服务器拉取示例（需将 PACKAGE 设为仓库可见性或配置 read:packages）：
@@ -42,10 +42,12 @@ jobs:
       - name: 安装 Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: svr/go.mod
           cache: true
+          cache-dependency-path: svr/go.sum
 
       - name: 运行测试
+        working-directory: svr
         run: go test ./tests/...
 
   build:
@@ -78,7 +80,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=wiki,enable={{is_default_branch}}
+            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
@@ -98,7 +100,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: 签名镜像（cosign）
+      - name: 安装 Cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3
         with:

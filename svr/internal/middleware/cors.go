@@ -14,7 +14,7 @@ import (
 func CORS(cfg config.Config) gin.HandlerFunc {
 	allowedOrigins := cfg.Server.AllowedOrigins
 	if len(allowedOrigins) == 0 {
-		allowedOrigins = []string{"http://localhost:94001"}
+		allowedOrigins = []string{"http://localhost:8081"}
 	}
 
 	return func(c *gin.Context) {
