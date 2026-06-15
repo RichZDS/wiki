@@ -10,11 +10,16 @@ log/
 # Go build output
 /bin/
 /dist/
+/build/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Frontend
+ui/node_modules/
+ui/dist/
 
 # Go test and coverage output
 *.test
