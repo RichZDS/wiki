@@ -1,0 +1,25 @@
+server:
+  port: 8080
+  app_name: wiki
+  allowed_origins:
+    - "http://localhost:94001"
+
+log:
+  level: debug
+
+mysql:
+  host: 43.142.166.108
+  port: 3306
+  user: root
+  password: "12345678"
+  database: wiki
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+  conn_max_lifetime: 3600
+
+redis:
+  host: 43.142.166.108
+  port: 6379
+  password: "1218Zhengyaqi!"
+  db: 0
