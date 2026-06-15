@@ -8,13 +8,14 @@ import (
 	"wiki/internal/config"
 	"wiki/internal/controller"
 	"wiki/internal/middleware"
+	"wiki/internal/model"
 	"wiki/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 // New 创建并初始化对应的实例。
-func New(cfg config.Config) *gin.Engine {
+func New(cfg config.Config, ragSvc *model.RAGService) *gin.Engine {
 	if cfg.Env == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -30,6 +31,7 @@ func New(cfg config.Config) *gin.Engine {
 
 	userCtl := controller.NewUserController()
 	chunkCtl := controller.NewChunkController()
+	ragCtl := controller.NewRAGController(ragSvc)
 
 	api := r.Group("/api/v1")
 	{
@@ -41,6 +43,9 @@ func New(cfg config.Config) *gin.Engine {
 
 		api.POST("/chunk", chunkCtl.Chunk)
 		api.POST("/chunk/compare", chunkCtl.Compare)
+
+		api.POST("/rag/ingest", ragCtl.Ingest)
+		api.POST("/rag/search", ragCtl.Search)
 	}
 
 	// 生产环境下托管前端静态文件（SPA fallback）

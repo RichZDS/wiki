@@ -39,8 +39,12 @@ github.com/cloudwego/eino-ext/components/embedding/ark v0.1.2 h1:mc+dFLiF8t0C0up
 github.com/cloudwego/eino-ext/components/embedding/ark v0.1.2/go.mod h1:sCcJvvx3/qb95LlvacRBt6YuvYkLGssaP7of3GzRrow=
 github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260612103359-5b10d0299532 h1:OAEkMeYNS4DVR7RxTKe1f+7jyEWzdZSSm1dtwBf8S5k=
 github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260612103359-5b10d0299532/go.mod h1:zyPrZT2bO6LyRJgVksQowR18jVgyLSvqK93hnO53/Lc=
+github.com/cloudwego/eino-ext/components/indexer/redis v0.0.0-20260612103359-5b10d0299532 h1:QU4Pdn7RiuZj1//NGWN5ew5X8Yt3E40NqNX/ymoDNYw=
+github.com/cloudwego/eino-ext/components/indexer/redis v0.0.0-20260612103359-5b10d0299532/go.mod h1:yx19qVmk970TjutWgNwlLcaRkrTR0fEHKecLkJGcxoA=
 github.com/cloudwego/eino-ext/components/model/openai v0.1.13 h1:5XHRTiTD5bt9KQrMHcfvuWNklEC3tpm3XHejdozt9vM=
 github.com/cloudwego/eino-ext/components/model/openai v0.1.13/go.mod h1:mgIoqYYOc0eECCqvLbEYpOJrQNTNxkwXzSJzFU+v5sQ=
+github.com/cloudwego/eino-ext/components/retriever/redis v0.0.0-20260612103359-5b10d0299532 h1:NHA5JSHaRn/gbys92dnbAhJ/6tVcVv1UOtCKuIxAciU=
+github.com/cloudwego/eino-ext/components/retriever/redis v0.0.0-20260612103359-5b10d0299532/go.mod h1:C+JX7vgZmt/XBEXCS2KeJvyVBUeQ0Aem+xTI8AWdx3s=
 github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 h1:EeVcR1TslRA2IdNW1h/2LaGbPlffwGhQm99jM3zWZiI=
 github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17/go.mod h1:Zkcx6DPTR2NfWmtSXbhItswGw6hqUezNPhNcke0pOG8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

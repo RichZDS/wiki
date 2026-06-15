@@ -12,6 +12,7 @@ import (
 
 	"wiki/internal/config"
 	"wiki/internal/job"
+	"wiki/internal/rag"
 	"wiki/internal/router"
 	"wiki/pkg/database"
 	"wiki/pkg/logger"
@@ -39,6 +40,12 @@ func main() {
 	ctx, cancel := context.WithCancel(signalCtx)
 	defer cancel()
 
+	ragSvc, err := rag.Init(ctx, cfg)
+	if err != nil {
+		logger.Fatalf("rag init: %v", err)
+	}
+	defer rag.Cleanup()
+
 	jobManager := job.NewManager()
 	jobGroup := job.NewDefaultJobGroup(database.DB)
 	if err := jobGroup.RegisterAll(jobManager); err != nil {
@@ -46,7 +53,7 @@ func main() {
 	}
 	jobManager.Start(ctx)
 
-	r := router.New(cfg)
+	r := router.New(cfg, ragSvc)
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	server := &http.Server{
 		Addr:              addr,
