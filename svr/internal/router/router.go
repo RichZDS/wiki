@@ -1,6 +1,10 @@
 package router
 
 import (
+	"net/http"
+	"os"
+	"path/filepath"
+
 	"wiki/internal/config"
 	"wiki/internal/controller"
 	"wiki/internal/middleware"
@@ -39,5 +43,31 @@ func New(cfg config.Config) *gin.Engine {
 		api.POST("/chunk/compare", chunkCtl.Compare)
 	}
 
+	// 生产环境下托管前端静态文件（SPA fallback）
+	if publicDir := resolvePublicDir(); publicDir != "" {
+		r.Static("/assets", filepath.Join(publicDir, "assets"))
+
+		indexPath := filepath.Join(publicDir, "index.html")
+		r.NoRoute(func(c *gin.Context) {
+			// 如果是 API 路径，让 Gin 默认 404 处理
+			if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
+				c.JSON(http.StatusNotFound, gin.H{"code": 404, "err": "not found"})
+				return
+			}
+			c.File(indexPath)
+		})
+	}
+
 	return r
+}
+
+// resolvePublicDir 查找前端静态文件目录，不存在则返回空字符串。
+func resolvePublicDir() string {
+	candidates := []string{"public", "../public", "../../public"}
+	for _, dir := range candidates {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			return dir
+		}
+	}
+	return ""
 }

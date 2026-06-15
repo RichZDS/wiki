@@ -1,5 +1,15 @@
-# ---- 构建阶段 ----
-FROM golang:1.25-alpine AS builder
+# ---- 前端构建阶段 ----
+FROM node:20-alpine AS ui-builder
+
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+
+COPY ui/ ./
+RUN npm run build
+
+# ---- Go 构建阶段 ----
+FROM golang:1.25-alpine AS go-builder
 
 RUN apk --no-cache add ca-certificates
 
@@ -21,9 +31,12 @@ RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
-# 复制编译产物与配置文件
-COPY --from=builder /wiki .
+# 复制 Go 编译产物与配置文件
+COPY --from=go-builder /wiki .
 COPY svr/manifest/ ./manifest/
+
+# 复制前端构建产物
+COPY --from=ui-builder /ui/dist/ ./public/
 
 EXPOSE 8081
 
