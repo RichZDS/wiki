@@ -1,6 +1,10 @@
 package model
 
-import "context"
+import (
+	"context"
+
+	einoembedding "github.com/cloudwego/eino/components/embedding"
+)
 
 // MockEmbedder 是 Embedder 的模拟实现，用于测试语义切块等依赖向量的功能。
 //
@@ -10,15 +14,13 @@ type MockEmbedder struct {
 	Vectors [][]float64
 }
 
-// EmbedStrings 返回模拟的文本向量表示。
-func (m *MockEmbedder) EmbedStrings(ctx context.Context, texts []string) ([][]float64, error) {
+// EmbedStrings 实现 eino embedding.Embedder 接口，返回模拟的文本向量表示。
+func (m *MockEmbedder) EmbedStrings(_ context.Context, texts []string, _ ...einoembedding.Option) ([][]float64, error) {
 	if m.Vectors != nil {
 		return m.Vectors, nil
 	}
-	// 未设置预设向量时，生成简单的固定模式向量（用于测试中不关心具体值的场景）
 	result := make([][]float64, len(texts))
 	for i := range texts {
-		// 每个文本生成 3 维模拟向量，值随索引递增以保证相邻句子有较高相似度
 		result[i] = []float64{float64(i) * 0.1, float64(i)*0.1 + 0.5, float64(i)*0.1 + 1.0}
 	}
 	return result, nil

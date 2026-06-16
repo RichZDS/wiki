@@ -1,9 +1,8 @@
 package embedding
 
-import "context"
+import einoembedding "github.com/cloudwego/eino/components/embedding"
 
-// Embedder 计算文本序列的稠密向量表示。
-// 实现者（如 OpenAI text-embedding-3-small 等）应保证同一模型的一致性。
-type Embedder interface {
-	EmbedStrings(ctx context.Context, texts []string) ([][]float64, error)
-}
+// Embedder 是项目内部使用的文本向量化接口，与 Eino 官方接口保持一致。
+//
+// 通过类型别名统一接口签名，避免在 chunker / indexer / retriever 之间编写适配层。
+type Embedder = einoembedding.Embedder

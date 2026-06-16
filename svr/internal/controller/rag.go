@@ -25,6 +25,7 @@ func ingest(c *gin.Context, svc *model.RAGService) {
 		return
 	}
 
+	//执行文档入库流程：文本 → 切块 → embedding → Redis 存储。
 	result, err := svc.Ingest(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "ingest failed: "+err.Error())

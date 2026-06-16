@@ -16,10 +16,10 @@ func GetAIModelByName(ctx context.Context, db *gorm.DB, modelName string) (*AIMo
 	return &aimodel, nil
 }
 
-// ListAllAIModels 查询所有 AI 模型配置。
-func ListAllAIModels(ctx context.Context, db *gorm.DB) ([]AIModel, error) {
+// ListAllAIModelsInNeed 查询所有 AI 模型配置。
+func ListAllAIModelsInNeed(ctx context.Context, db *gorm.DB) ([]AIModel, error) {
 	var models []AIModel
-	if err := db.WithContext(ctx).Find(&models).Error; err != nil {
+	if err := db.WithContext(ctx).Where("is_check = ?", 0).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("list ai_models: %w", err)
 	}
 	return models, nil

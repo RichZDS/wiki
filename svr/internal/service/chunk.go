@@ -117,11 +117,7 @@ func buildChunker(ctx context.Context, strategy string) (chunk.Chunker, error) {
 func tryCreateEmbedder(ctx context.Context) (embedding.Embedder, error) {
 	if apiKey := os.Getenv("ARK_API_KEY"); apiKey != "" {
 		modelID := os.Getenv("ARK_EMBEDDING_MODEL")
-		emb, err := embedding.NewArkEmbedder(ctx, apiKey, modelID, "", "")
-		if err != nil {
-			return nil, err
-		}
-		return &embedderAdapter{ark: emb}, nil
+		return embedding.NewArkEmbedder(ctx, apiKey, modelID, "", "")
 	}
 
 	if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
@@ -129,28 +125,10 @@ func tryCreateEmbedder(ctx context.Context) (embedding.Embedder, error) {
 		if modelID == "" {
 			modelID = "text-embedding-3-small"
 		}
-		emb, err := embedding.NewOpenAIEmbedder(ctx, apiKey, modelID, "", "")
-		if err != nil {
-			return nil, err
-		}
-		return &embedderAdapter{openai: emb}, nil
+		return embedding.NewOpenAIEmbedder(ctx, apiKey, modelID, "", "")
 	}
 
 	return nil, fmt.Errorf("no embedding service configured: set ARK_API_KEY or OPENAI_API_KEY")
-}
-
-// embedderAdapter 将 eino-ext 的 Embedder（带 ...Option 参数）适配到本地的 Embedder 接口。
-type embedderAdapter struct {
-	ark   *embedding.ArkEmbedder
-	openai *embedding.OpenAIEmbedder
-}
-
-// EmbedStrings 实现 embedding.Embedder 接口，忽略 eino-ext 的变长 Option 参数。
-func (a *embedderAdapter) EmbedStrings(ctx context.Context, texts []string) ([][]float64, error) {
-	if a.ark != nil {
-		return a.ark.EmbedStrings(ctx, texts)
-	}
-	return a.openai.EmbedStrings(ctx, texts)
 }
 
 // buildChunkResult 将 Eino Document 切片转换为 API 响应格式并计算统计信息。

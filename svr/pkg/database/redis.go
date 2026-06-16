@@ -13,10 +13,6 @@ import (
 
 var RDB *redis.Client
 
-// VectorRDB 是用于向量搜索（FT.SEARCH）的 Redis 客户端，
-// 配置了 Protocol=2 和 UnstableResp3=true 以满足 RediSearch 要求。
-var VectorRDB *redis.Client
-
 // InitRedis 初始化对应的基础设施组件。
 func InitRedis(cfg config.RedisConfig) {
 	RDB = redis.NewClient(&redis.Options{

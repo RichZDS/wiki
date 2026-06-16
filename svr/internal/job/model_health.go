@@ -1,3 +1,5 @@
+// Package job 模型健康检查：通过 eino 组件接口（embedding.Embedder.EmbedStrings、
+// model.BaseChatModel.Generate）发起 1-token 探测，统一 chat 与 embedding 的检查方式。
 package job
 
 import (
@@ -8,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"wiki/internal/ai/embedding"
 	"wiki/internal/model"
 	"wiki/internal/model/consts"
 	"wiki/pkg/database"
@@ -15,29 +18,39 @@ import (
 	"wiki/pkg/utils"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"gorm.io/gorm"
 )
 
-type modelProvider struct {
-	baseURL   string
-	apiKeyEnv string
-}
-
-var defaultModelProviders = map[string]modelProvider{
-	"openai":   {baseURL: "https://api.openai.com/v1", apiKeyEnv: "OPENAI_API_KEY"},
-	"deepseek": {baseURL: "https://api.deepseek.com", apiKeyEnv: "DEEPSEEK_API_KEY"},
-	"minimax":  {baseURL: "https://api.minimax.chat", apiKeyEnv: "MINIMAX_API_KEY"},
-}
-
+// ModelChecker 是模型健康探测的最小接口。
+// 实现者通过 eino 的组件 API（Generate / EmbedStrings）发起一次极小请求验证可用性。
 type ModelChecker interface {
 	Check(context.Context) error
 }
 
-type ModelHealthTask = model.ModelHealthTask
-type compatibleModelChecker = model.CompatibleModelChecker
+type (
+	// providerSpec 描述兼容 OpenAI 协议的 chat 端点。
+	providerSpec struct {
+		baseURL string
+		envKey  string
+	}
+	// chatModelFactory 在每次探测时按当前 api_key 构造 eino ChatModel。
+	chatModelFactory func(ctx context.Context) (einomodel.BaseChatModel, error)
+	// embedderFactory 在每次探测时按当前 api_key 构造 eino Embedder。
+	embedderFactory func(ctx context.Context) (embedding.Embedder, error)
+)
 
-// NewModelHealthTask 创建并初始化对应的实例。
+var defaultProviders = map[string]providerSpec{
+	"openai":   {baseURL: "https://api.openai.com/v1", envKey: "OPENAI_API_KEY"},
+	"deepseek": {baseURL: "https://api.deepseek.com", envKey: "DEEPSEEK_API_KEY"},
+	"minimax":  {baseURL: "https://api.minimaxi.com/v1", envKey: "MINIMAX_API_KEY"},
+}
+
+// ModelHealthTask 是 model 包对外暴露的任务句柄类型，便于其他包引用。
+type ModelHealthTask = model.ModelHealthTask
+
+// NewModelHealthTask 创建模型健康检查周期任务。
 func NewModelHealthTask(db *gorm.DB, checkers map[string]ModelChecker) *ModelHealthTask {
 	return &model.ModelHealthTask{
 		RunFunc: func(ctx context.Context) error {
@@ -46,127 +59,159 @@ func NewModelHealthTask(db *gorm.DB, checkers map[string]ModelChecker) *ModelHea
 	}
 }
 
-// runModelHealth 检查全部模型并同步其可用状态。
-func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelChecker, timeout time.Duration) error {
-	if db == nil {
-		return errors.New("model health database is nil")
-	}
+// DefaultModelCheckers 从 ai_model 表读取所有需要监控的模型并构建探测器映射。
+// 当前支持：
+//   - "embedding"  -> 通过 embedding.Embedder.EmbedStrings 探测（Gemini）
+//   - "openai/deepseek/minimax" -> 通过 model.BaseChatModel.Generate 探测
+func DefaultModelCheckers() map[string]ModelChecker {
+	ctx := context.Background()
+	log := logger.GetLogger()
+	checkers := make(map[string]ModelChecker)
 
-	models, err := model.ListAllAIModels(ctx, db)
+	models, err := model.ListAllAIModelsInNeed(ctx, database.DB)
 	if err != nil {
-		return fmt.Errorf("list models: %w", err)
+		log.Printf("[JOB] load ai_model failed: %v", err)
+		return checkers
 	}
 
-	var updateErrors []error
-	for _, current := range models {
-		if err := ctx.Err(); err != nil {
-			return errors.Join(append(updateErrors, err)...)
-		}
-
-		available, failReason := checkModel(ctx, current.ModelName, checkers, timeout)
-		if err := ctx.Err(); err != nil {
-			return errors.Join(append(updateErrors, err)...)
-		}
-
-		wanted := int8(0)
-		nextFailReason := failReason
-		if available {
-			wanted = 1
-			nextFailReason = ""
-		}
-
-		if current.IsUsed == wanted && current.FailReason == nextFailReason {
+	for _, m := range models {
+		modelID := strings.TrimSpace(m.ModelId)
+		if modelID == "" {
+			markUnavailable(ctx, m.ID, consts.ModelFailReasonNotFound)
 			continue
 		}
 
-		if err := model.UpdateAIModelStatus(ctx, db, current.ID, wanted, nextFailReason); err != nil {
-			updateErrors = append(updateErrors, fmt.Errorf("update model %q: %w", current.ModelName, err))
+		if m.ModelName == "embedding" {
+			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID)
 			continue
 		}
 
-		logger.GetLogger().Printf("[JOB] model %s availability changed to %d", current.ModelName, wanted)
+		spec, ok := defaultProviders[m.ModelName]
+		if !ok {
+			markUnavailable(ctx, m.ID, consts.ModelFailReasonNotFound)
+			continue
+		}
+		checkers[m.ModelName] = newChatChecker(spec, m.ID, modelID)
 	}
-
-	return errors.Join(updateErrors...)
+	return checkers
 }
 
-// checkModel 调用指定模型的健康检查器。
-func checkModel(ctx context.Context, modelName string, checkers map[string]ModelChecker, timeout time.Duration) (bool, string) {
-	checker, ok := checkers[modelName]
-	if !ok {
-		reason := consts.ModelFailReasonNotFound
-		logger.GetLogger().Printf("[JOB] model %s has no registered health checker", modelName)
-		return false, reason
+// newChatChecker 返回基于 eino BaseChatModel.Generate 的探测器。
+func newChatChecker(spec providerSpec, recordID int64, modelID string) ModelChecker {
+	factory := func(ctx context.Context) (einomodel.BaseChatModel, error) {
+		apiKey := resolveAPIKey(ctx, recordID, spec.envKey)
+		if apiKey == "" {
+			return nil, errors.New("API key is not configured")
+		}
+		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
+			BaseURL:     resolveBaseURL(spec),
+			APIKey:      apiKey,
+			Model:       modelID,
+			MaxTokens:   utils.Ptr(1),
+			Temperature: utils.Ptr(float32(0)),
+		})
 	}
-
-	probeCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	if err := checker.Check(probeCtx); err != nil {
-		reason := err.Error()
-		logger.GetLogger().Printf("[JOB] model %s health check failed: %v", modelName, err)
-		return false, reason
+	return &model.CompatibleModelChecker{
+		CheckFunc: func(ctx context.Context) error { return probeChat(ctx, factory) },
 	}
-	return true, ""
 }
 
-// checkCompatibleModel 调用兼容 OpenAI 协议的接口进行探测。
-func checkCompatibleModel(ctx context.Context, baseURL, apiKey, modelName string) error {
-	if strings.TrimSpace(apiKey) == "" {
-		return errors.New("API key is not configured")
+// newEmbeddingChecker 返回基于 eino embedding.Embedder.EmbedStrings 的探测器。
+func newEmbeddingChecker(recordID int64, modelID string) ModelChecker {
+	factory := func(ctx context.Context) (embedding.Embedder, error) {
+		apiKey := resolveAPIKey(ctx, recordID, "GEMINI_API_KEY")
+		if apiKey == "" {
+			return nil, errors.New("API key is not configured")
+		}
+		return embedding.NewGeminiEmbedder(ctx, apiKey, modelID)
 	}
+	return &model.CompatibleModelChecker{
+		CheckFunc: func(ctx context.Context) error { return probeEmbed(ctx, factory) },
+	}
+}
 
-	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		BaseURL:     baseURL,
-		APIKey:      apiKey,
-		Model:       modelName,
-		MaxTokens:   utils.Ptr(1),
-		Temperature: utils.Ptr(float32(0)),
-	})
+// probeChat 用 1-token Generate 验证 chat 模型可达。
+func probeChat(ctx context.Context, factory chatModelFactory) error {
+	cm, err := factory(ctx)
 	if err != nil {
-		return fmt.Errorf("create model client: %w", err)
+		return fmt.Errorf("create chat model: %w", err)
 	}
-
-	if _, err := chatModel.Generate(ctx, []*schema.Message{schema.UserMessage("Reply OK.")}); err != nil {
+	if _, err := cm.Generate(ctx, []*schema.Message{schema.UserMessage("OK")}); err != nil {
 		return fmt.Errorf("generate probe: %w", err)
 	}
 	return nil
 }
 
-// DefaultModelCheckers 从 ai_model 表读取模型并构建健康检查器映射。
-func DefaultModelCheckers() map[string]ModelChecker {
-	checkers := make(map[string]ModelChecker)
-
-	ctx := context.Background()
-	models, err := model.ListAllAIModels(ctx, database.DB)
+// probeEmbed 用单条文本 EmbedStrings 验证 embedding 模型可达。
+func probeEmbed(ctx context.Context, factory embedderFactory) error {
+	emb, err := factory(ctx)
 	if err != nil {
-		logger.GetLogger().Printf("[JOB] load ai_model failed: %v", err)
-		return checkers
+		return fmt.Errorf("create embedder: %w", err)
 	}
-
-	for _, current := range models {
-		provider, ok := defaultModelProviders[current.ModelName]
-		if !ok {
-			markModelUnavailable(ctx, current.ID, consts.ModelFailReasonNotFound)
-			continue
-		}
-
-		modelID := strings.TrimSpace(current.ModelId)
-		if modelID == "" {
-			markModelUnavailable(ctx, current.ID, consts.ModelFailReasonNotFound)
-			continue
-		}
-
-		checkers[current.ModelName] = newCompatibleModelChecker(database.DB, provider, current.ID, modelID)
+	if _, err := emb.EmbedStrings(ctx, []string{"probe"}); err != nil {
+		return fmt.Errorf("embed probe: %w", err)
 	}
-
-	return checkers
+	return nil
 }
 
-// resolveModelAPIKey 优先使用 ai_model.api_key，为空时回退到环境变量。
-func resolveModelAPIKey(ctx context.Context, db *gorm.DB, id int64, envKey string) string {
-	if db != nil {
-		if key, err := model.GetAIModelAPIKey(ctx, db, id); err == nil {
+// runModelHealth 遍历需要监控的模型并同步可用状态到 ai_model 表。
+func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelChecker, timeout time.Duration) error {
+	if db == nil {
+		return errors.New("model health database is nil")
+	}
+
+	models, err := model.ListAllAIModelsInNeed(ctx, db)
+	if err != nil {
+		return fmt.Errorf("list models: %w", err)
+	}
+
+	var errs []error
+	log := logger.GetLogger()
+	for _, current := range models {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(errs, err)...)
+		}
+
+		ok, reason := probeOne(ctx, current.ModelName, checkers, timeout)
+
+		wantUsed := int8(0)
+		wantReason := reason
+		if ok {
+			wantUsed, wantReason = 1, ""
+		}
+		if current.IsUsed == wantUsed && current.FailReason == wantReason {
+			continue
+		}
+
+		if err := model.UpdateAIModelStatus(ctx, db, current.ID, wantUsed, wantReason); err != nil {
+			errs = append(errs, fmt.Errorf("update %q: %w", current.ModelName, err))
+			continue
+		}
+		log.Printf("[JOB] model %s availability=%d", current.ModelName, wantUsed)
+	}
+	return errors.Join(errs...)
+}
+
+// probeOne 调用指定模型的 checker 并返回（是否可用，失败原因）。
+func probeOne(ctx context.Context, name string, checkers map[string]ModelChecker, timeout time.Duration) (bool, string) {
+	checker, ok := checkers[name]
+	if !ok {
+		logger.GetLogger().Printf("[JOB] model %s has no registered checker", name)
+		return false, consts.ModelFailReasonNotFound
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	if err := checker.Check(probeCtx); err != nil {
+		logger.GetLogger().Printf("[JOB] model %s health check failed: %v", name, err)
+		return false, err.Error()
+	}
+	return true, ""
+}
+
+// resolveAPIKey 优先读取 ai_model.api_key，缺省回退到环境变量。
+func resolveAPIKey(ctx context.Context, id int64, envKey string) string {
+	if database.DB != nil {
+		if key, err := model.GetAIModelAPIKey(ctx, database.DB, id); err == nil {
 			if k := strings.TrimSpace(key); k != "" {
 				return k
 			}
@@ -175,19 +220,19 @@ func resolveModelAPIKey(ctx context.Context, db *gorm.DB, id int64, envKey strin
 	return strings.TrimSpace(os.Getenv(envKey))
 }
 
-// newCompatibleModelChecker 为指定 provider 创建基于 model_id 的健康检查器。
-func newCompatibleModelChecker(db *gorm.DB, provider modelProvider, recordID int64, modelID string) *model.CompatibleModelChecker {
-	return &model.CompatibleModelChecker{
-		CheckFunc: func(ctx context.Context) error {
-			apiKey := resolveModelAPIKey(ctx, db, recordID, provider.apiKeyEnv)
-			return checkCompatibleModel(ctx, provider.baseURL, apiKey, modelID)
-		},
+// resolveBaseURL 返回 provider 的 Base URL，特殊 provider 支持环境变量覆盖。
+func resolveBaseURL(spec providerSpec) string {
+	if spec.envKey == "MINIMAX_API_KEY" {
+		if u := strings.TrimSpace(os.Getenv("MINIMAX_BASE_URL")); u != "" {
+			return u
+		}
 	}
+	return spec.baseURL
 }
 
-// markModelUnavailable 将模型标记为不可用并记录失败原因。
-func markModelUnavailable(ctx context.Context, id int64, failReason string) {
-	if err := model.UpdateAIModelStatus(ctx, database.DB, id, 0, failReason); err != nil {
+// markUnavailable 把模型置为不可用并记录失败原因。
+func markUnavailable(ctx context.Context, id int64, reason string) {
+	if err := model.UpdateAIModelStatus(ctx, database.DB, id, 0, reason); err != nil {
 		logger.GetLogger().Printf("[JOB] mark model %d unavailable: %v", id, err)
 	}
 }
