@@ -15,7 +15,7 @@ import (
 )
 
 // New 创建并初始化对应的实例。
-func New(cfg config.Config, ragSvc *model.RAGService) *gin.Engine {
+func New(cfg config.Config, ragSvc *model.RAGService, jobManager *model.JobManager) *gin.Engine {
 	if cfg.Env == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -32,6 +32,7 @@ func New(cfg config.Config, ragSvc *model.RAGService) *gin.Engine {
 	userCtl := controller.NewUserController()
 	chunkCtl := controller.NewChunkController()
 	ragCtl := controller.NewRAGController(ragSvc)
+	jobCtl := controller.NewJobController(jobManager)
 
 	api := r.Group("/api/v1")
 	{
@@ -46,6 +47,13 @@ func New(cfg config.Config, ragSvc *model.RAGService) *gin.Engine {
 
 		api.POST("/rag/ingest", ragCtl.Ingest)
 		api.POST("/rag/search", ragCtl.Search)
+
+		api.GET("/jobs", jobCtl.List)
+		api.GET("/jobs/:name", jobCtl.Get)
+		api.POST("/jobs/:name/start", jobCtl.Start)
+		api.POST("/jobs/:name/stop", jobCtl.Stop)
+		api.POST("/jobs/:name/run", jobCtl.RunNow)
+		api.GET("/jobs/:name/logs", jobCtl.Logs)
 	}
 
 	// 生产环境下托管前端静态文件（SPA fallback）

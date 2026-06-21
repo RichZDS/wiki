@@ -14,6 +14,8 @@ type ServerConfig = model.ServerConfig
 type LogConfig = model.LogConfig
 type MySQLConfig = model.MySQLConfig
 type RedisConfig = model.RedisConfig
+type RAGConfig = model.RAGConfig
+type JobConfig = model.JobConfig
 
 // resolveConfigPath 从环境变量或上级目录的 manifest/config 中查找配置文件。
 func resolveConfigPath(filename string) string {
@@ -135,6 +137,44 @@ func merge(base, override Config) Config {
 	}
 	if override.Redis.DB != 0 {
 		base.Redis.DB = override.Redis.DB
+	}
+
+	if override.RAG.IndexName != "" {
+		base.RAG.IndexName = override.RAG.IndexName
+	}
+	if override.RAG.KeyPrefix != "" {
+		base.RAG.KeyPrefix = override.RAG.KeyPrefix
+	}
+	if override.RAG.VectorField != "" {
+		base.RAG.VectorField = override.RAG.VectorField
+	}
+	if override.RAG.VectorDim != 0 {
+		base.RAG.VectorDim = override.RAG.VectorDim
+	}
+	if override.RAG.VectorIndexType != "" {
+		base.RAG.VectorIndexType = override.RAG.VectorIndexType
+	}
+	if override.RAG.BatchSize != 0 {
+		base.RAG.BatchSize = override.RAG.BatchSize
+	}
+	if override.RAG.DefaultTopK != 0 {
+		base.RAG.DefaultTopK = override.RAG.DefaultTopK
+	}
+	if override.RAG.MaxTopK != 0 {
+		base.RAG.MaxTopK = override.RAG.MaxTopK
+	}
+	if override.RAG.HNSWMaxEdgesPerNode != 0 {
+		base.RAG.HNSWMaxEdgesPerNode = override.RAG.HNSWMaxEdgesPerNode
+	}
+	if override.RAG.HNSWEFConstruction != 0 {
+		base.RAG.HNSWEFConstruction = override.RAG.HNSWEFConstruction
+	}
+	if override.RAG.HNSWEFRuntime != 0 {
+		base.RAG.HNSWEFRuntime = override.RAG.HNSWEFRuntime
+	}
+
+	if override.Job.LogDBLevel != "" {
+		base.Job.LogDBLevel = override.Job.LogDBLevel
 	}
 
 	return base

@@ -31,4 +31,6 @@ export interface RAGSearchItem {
 
 export interface RAGSearchResult {
   results: RAGSearchItem[]
+  top_k: number
+  duration_ms: number
 }

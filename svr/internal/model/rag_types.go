@@ -40,7 +40,9 @@ type RAGSearchItem struct {
 
 // RAGSearchResult 语义检索响应体。
 type RAGSearchResult struct {
-	Results []RAGSearchItem `json:"results"`
+	Results    []RAGSearchItem `json:"results"`
+	TopK       int             `json:"top_k"`
+	DurationMS int64           `json:"duration_ms"`
 }
 
 // RAGController RAG 控制器，函数字段由 controller 层注入。

@@ -23,3 +23,19 @@ redis:
   port: 6379
   password: "1218Zhengyaqi!"
   db: 0
+
+rag:
+  index_name: wiki_vector_idx
+  key_prefix: "doc:"
+  vector_field: vector_content
+  vector_dim: 3072
+  vector_index_type: hnsw
+  batch_size: 10
+  default_top_k: 5
+  max_top_k: 50
+  hnsw_max_edges_per_node: 16
+  hnsw_ef_construction: 200
+  hnsw_ef_runtime: 10
+
+job:
+  log_db_level: info

@@ -12,6 +12,7 @@ import (
 
 	"wiki/internal/config"
 	"wiki/internal/job"
+	"wiki/internal/model"
 	"wiki/internal/rag"
 	"wiki/internal/router"
 	"wiki/pkg/database"
@@ -46,14 +47,17 @@ func main() {
 	}
 	defer rag.Cleanup()
 
-	jobManager := job.NewManager()
+	jobManager := job.NewManager(model.JobManagerOptions{
+		DB:         database.DB,
+		LogDBLevel: cfg.Job.LogDBLevel,
+	})
 	jobGroup := job.NewDefaultJobGroup(database.DB)
 	if err := jobGroup.RegisterAll(jobManager); err != nil {
 		logger.Fatalf("register jobs: %v", err)
 	}
 	jobManager.Start(ctx)
 
-	r := router.New(cfg, ragSvc)
+	r := router.New(cfg, ragSvc, jobManager)
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	server := &http.Server{
 		Addr:              addr,

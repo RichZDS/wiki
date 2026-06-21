@@ -20,6 +20,7 @@ log/
 # Frontend
 ui/node_modules/
 ui/dist/
+*.tsbuildinfo
 
 # Go test and coverage output
 *.test

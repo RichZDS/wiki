@@ -24,3 +24,19 @@ CREATE TABLE IF NOT EXISTS `ai_model` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_model_name` (`model_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型状态表';
+
+
+-- Job 日志表
+CREATE TABLE IF NOT EXISTS `job_log` (
+    `id`         BIGINT        NOT NULL COMMENT '主键（雪花算法生成）',
+    `job_name`   VARCHAR(128)  NOT NULL COMMENT '任务名称',
+    `run_id`     VARCHAR(64)   NOT NULL COMMENT '单次运行 ID',
+    `level`      VARCHAR(16)   NOT NULL COMMENT '日志级别：debug/info/warn/error',
+    `message`    VARCHAR(1024) NOT NULL COMMENT '日志内容',
+    `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_job_name` (`job_name`),
+    KEY `idx_run_id` (`run_id`),
+    KEY `idx_level` (`level`),
+    KEY `idx_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Job 日志表';
