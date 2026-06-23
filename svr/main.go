@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"wiki/internal/callback"
 	"wiki/internal/config"
 	"wiki/internal/job"
 	"wiki/internal/model"
@@ -29,6 +30,7 @@ func main() {
 
 	logger.Init(cfg.Env)
 	logger := logger.GetLogger()
+	callback.RegisterEinoGlobalHandlers()
 
 	database.InitMySQL(cfg.MySQL)
 	defer database.Close()

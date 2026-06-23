@@ -17,6 +17,7 @@ import (
 	"wiki/pkg/logger"
 	"wiki/pkg/utils"
 
+	"github.com/cloudwego/eino-ext/components/model/claude"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -44,7 +45,7 @@ type (
 var defaultProviders = map[string]providerSpec{
 	"openai":   {baseURL: "https://api.openai.com/v1", envKey: "OPENAI_API_KEY"},
 	"deepseek": {baseURL: "https://api.deepseek.com", envKey: "DEEPSEEK_API_KEY"},
-	"minimax":  {baseURL: "https://api.minimaxi.com/v1", envKey: "MINIMAX_API_KEY"},
+	"minimax":  {baseURL: "https://api.minimax.chat/v1", envKey: "MINIMAX_API_KEY"},
 }
 
 // ModelHealthTask 是 model 包对外暴露的任务句柄类型，便于其他包引用。
@@ -85,6 +86,10 @@ func DefaultModelCheckers() map[string]ModelChecker {
 			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID)
 			continue
 		}
+		if m.ModelName == "minimax" {
+			checkers[m.ModelName] = newClaudeChecker(defaultProviders[m.ModelName], m.ID, modelID, m.BaseURLValue())
+			continue
+		}
 
 		spec, ok := defaultProviders[m.ModelName]
 		if !ok {
@@ -108,6 +113,27 @@ func newChatChecker(spec providerSpec, recordID int64, modelID, dbBaseURL string
 			APIKey:      apiKey,
 			Model:       modelID,
 			MaxTokens:   utils.Ptr(1),
+			Temperature: utils.Ptr(float32(0)),
+		})
+	}
+	return &model.CompatibleModelChecker{
+		CheckFunc: func(ctx context.Context) error { return probeChat(ctx, factory) },
+	}
+}
+
+// newClaudeChecker 返回基于 Anthropic Messages API 的探测器。
+func newClaudeChecker(spec providerSpec, recordID int64, modelID, dbBaseURL string) ModelChecker {
+	factory := func(ctx context.Context) (einomodel.BaseChatModel, error) {
+		apiKey := resolveAPIKey(ctx, recordID, spec.envKey)
+		if apiKey == "" {
+			return nil, errors.New("API key is not configured")
+		}
+		baseURL := resolveBaseURL(spec, dbBaseURL)
+		return claude.NewChatModel(ctx, &claude.Config{
+			BaseURL:     utils.Ptr(baseURL),
+			APIKey:      apiKey,
+			Model:       modelID,
+			MaxTokens:   1,
 			Temperature: utils.Ptr(float32(0)),
 		})
 	}
