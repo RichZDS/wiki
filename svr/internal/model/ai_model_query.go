@@ -31,7 +31,7 @@ func GetAIModelAPIKey(ctx context.Context, db *gorm.DB, id int64) (string, error
 	if err := db.WithContext(ctx).Select("api_key").First(&record, id).Error; err != nil {
 		return "", fmt.Errorf("get ai_model api_key (id=%d): %w", id, err)
 	}
-	return record.APIKey, nil
+	return record.APIKeyValue(), nil
 }
 
 // UpdateAIModelStatus 更新指定模型的可用状态和失败原因。
@@ -41,6 +41,7 @@ func UpdateAIModelStatus(ctx context.Context, db *gorm.DB, id int64, isUsed int8
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"is_used":     isUsed,
+			"is_check":    isUsed,
 			"fail_reason": failReason,
 		})
 	if result.Error != nil {
