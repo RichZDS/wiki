@@ -45,6 +45,9 @@ var defaultProviders = map[string]providerSpec{
 	"openai":   {baseURL: "https://api.openai.com/v1", envKey: "OPENAI_API_KEY"},
 	"deepseek": {baseURL: "https://api.deepseek.com", envKey: "DEEPSEEK_API_KEY"},
 	"minimax":  {baseURL: "https://api.minimaxi.com/v1", envKey: "MINIMAX_API_KEY"},
+	"moonshot": {baseURL: "https://api.moonshot.cn/v1", envKey: "MOONSHOT_API_KEY"},
+	"zhipu":    {baseURL: "https://open.bigmodel.cn/api/paas/v4", envKey: "ZHIPU_API_KEY"},
+	"qwen":     {baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1", envKey: "QWEN_API_KEY"},
 }
 
 // ModelHealthTask 是 model 包对外暴露的任务句柄类型，便于其他包引用。
@@ -82,11 +85,17 @@ func DefaultModelCheckers() map[string]ModelChecker {
 		}
 
 		if m.ModelName == "embedding" {
-			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID)
+			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID, m.Provider)
 			continue
 		}
 
 		spec, ok := defaultProviders[m.ModelName]
+		if !ok {
+			// 回退到 provider 字段（兼容通过 provider 字段路由的场景）
+			if p := strings.ToLower(strings.TrimSpace(m.Provider)); p != "" {
+				spec, ok = defaultProviders[p]
+			}
+		}
 		if !ok {
 			markUnavailable(ctx, m.ID, consts.ModelFailReasonNotFound)
 			continue
@@ -117,13 +126,17 @@ func newChatChecker(spec providerSpec, recordID int64, modelID string) ModelChec
 }
 
 // newEmbeddingChecker 返回基于 eino embedding.Embedder.EmbedStrings 的探测器。
-func newEmbeddingChecker(recordID int64, modelID string) ModelChecker {
+// provider 参数从 ai_model.provider 字段读取，空值时默认 "gemini"。
+func newEmbeddingChecker(recordID int64, modelID, provider string) ModelChecker {
+	if provider == "" {
+		provider = "gemini"
+	}
 	factory := func(ctx context.Context) (embedding.Embedder, error) {
 		apiKey := resolveAPIKey(ctx, recordID, "GEMINI_API_KEY")
 		if apiKey == "" {
 			return nil, errors.New("API key is not configured")
 		}
-		return embedding.NewGeminiEmbedder(ctx, apiKey, modelID)
+		return embedding.NewEmbedderByProvider(ctx, provider, apiKey, modelID)
 	}
 	return &model.CompatibleModelChecker{
 		CheckFunc: func(ctx context.Context) error { return probeEmbed(ctx, factory) },

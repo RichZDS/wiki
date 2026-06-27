@@ -1,10 +1,6 @@
 package model
 
-import (
-	"context"
-
-	"github.com/gin-gonic/gin"
-)
+import "context"
 
 // RAGIngestRequest 文档入库请求体。
 // Content 为原始文档文本，Strategy 指定切块策略。
@@ -44,18 +40,6 @@ type RAGSearchResult struct {
 	TopK       int             `json:"top_k"`
 	DurationMS int64           `json:"duration_ms"`
 }
-
-// RAGController RAG 控制器，函数字段由 controller 层注入。
-type RAGController struct {
-	IngestFunc func(*gin.Context)
-	SearchFunc func(*gin.Context)
-}
-
-// Ingest 执行文档入库（切块 + 向量化 + 存储）并返回 JSON 结果。
-func (c *RAGController) Ingest(ctx *gin.Context) { c.IngestFunc(ctx) }
-
-// Search 执行语义检索并返回 JSON 结果。
-func (c *RAGController) Search(ctx *gin.Context) { c.SearchFunc(ctx) }
 
 // RAGService RAG 工作流服务，函数字段由 rag 包注入。
 type RAGService struct {

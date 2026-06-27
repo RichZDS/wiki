@@ -1,10 +1,6 @@
 package model
 
-import (
-	"context"
-
-	"github.com/gin-gonic/gin"
-)
+import "context"
 
 // ChunkRequest 单策略切块请求体。
 type ChunkRequest struct {
@@ -64,18 +60,6 @@ type ChunkCompareResult struct {
 	Results []ChunkStrategyResult `json:"results"`
 	Errors  map[string]string     `json:"errors,omitempty"`
 }
-
-// ChunkController 切块控制器，函数字段由 controller 层注入。
-type ChunkController struct {
-	ChunkFunc   func(*gin.Context)
-	CompareFunc func(*gin.Context)
-}
-
-// Chunk 执行单策略切块并返回 JSON 结果。
-func (c *ChunkController) Chunk(ctx *gin.Context) { c.ChunkFunc(ctx) }
-
-// Compare 执行多策略对比切块并返回 JSON 结果。
-func (c *ChunkController) Compare(ctx *gin.Context) { c.CompareFunc(ctx) }
 
 // ChunkService 切块服务，函数字段由 service 层注入。
 type ChunkService struct {

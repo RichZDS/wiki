@@ -62,7 +62,7 @@ func Init(ctx context.Context, cfg config.Config) (*model.RAGService, error) {
 	vectorRedis = rdb
 	log.Printf("RAG: vector redis 连接成功 %s:%s", cfg.Redis.Host, cfg.Redis.Port)
 
-	emb, err := embedding.NewGeminiEmbedderFromDB(ctx)
+	emb, err := embedding.NewEmbedderFromDB(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create embedder: %w", err)
 	}

@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -99,15 +98,6 @@ type JobService struct {
 	ListLogsFunc func(JobLogFilter) (*JobLogListResult, error)
 }
 
-type JobController struct {
-	ListFunc   func(*gin.Context)
-	GetFunc    func(*gin.Context)
-	StartFunc  func(*gin.Context)
-	StopFunc   func(*gin.Context)
-	RunNowFunc func(*gin.Context)
-	LogsFunc   func(*gin.Context)
-}
-
 // Register 注册周期任务。
 func (m *JobManager) Register(name string, interval time.Duration, handler JobHandler) error {
 	return m.RegisterFunc(name, interval, handler)
@@ -181,36 +171,6 @@ func (s *JobService) RunNow(name string) (*JobSnapshot, error) {
 // ListLogs 查询任务日志。
 func (s *JobService) ListLogs(filter JobLogFilter) (*JobLogListResult, error) {
 	return s.ListLogsFunc(filter)
-}
-
-// List 处理任务列表请求。
-func (c *JobController) List(ctx *gin.Context) {
-	c.ListFunc(ctx)
-}
-
-// Get 处理任务详情请求。
-func (c *JobController) Get(ctx *gin.Context) {
-	c.GetFunc(ctx)
-}
-
-// Start 处理启用任务请求。
-func (c *JobController) Start(ctx *gin.Context) {
-	c.StartFunc(ctx)
-}
-
-// Stop 处理停用任务请求。
-func (c *JobController) Stop(ctx *gin.Context) {
-	c.StopFunc(ctx)
-}
-
-// RunNow 处理立即执行任务请求。
-func (c *JobController) RunNow(ctx *gin.Context) {
-	c.RunNowFunc(ctx)
-}
-
-// Logs 处理任务日志查询请求。
-func (c *JobController) Logs(ctx *gin.Context) {
-	c.LogsFunc(ctx)
 }
 
 type ModelHealthTask struct {

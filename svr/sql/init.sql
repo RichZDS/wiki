@@ -25,6 +25,24 @@ CREATE TABLE IF NOT EXISTS `ai_model` (
     UNIQUE KEY `uk_model_name` (`model_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型状态表';
 
+-- 为 ai_model 表添加 provider 列（幂等迁移，已存在则跳过）
+-- 示例: provider 取值 gemini / openai / ark / deepseek 等
+DROP PROCEDURE IF EXISTS `add_provider_column`;
+DELIMITER $$
+CREATE PROCEDURE `add_provider_column`()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'ai_model'
+          AND COLUMN_NAME = 'provider'
+    ) THEN
+        ALTER TABLE `ai_model` ADD COLUMN `provider` VARCHAR(32) NOT NULL DEFAULT '' AFTER `api_key`;
+    END IF;
+END$$
+DELIMITER ;
+CALL `add_provider_column`();
+DROP PROCEDURE IF EXISTS `add_provider_column`;
 
 -- Job 日志表
 CREATE TABLE IF NOT EXISTS `job_log` (

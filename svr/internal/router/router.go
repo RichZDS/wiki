@@ -14,11 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// New 创建并初始化对应的实例。
+// New 创建并初始化 Gin 引擎，注册所有路由。
 func New(cfg config.Config, ragSvc *model.RAGService, jobManager *model.JobManager) *gin.Engine {
 	if cfg.Env == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
+
+	// 注入全局依赖到 controller 层。
+	controller.SetRAGService(ragSvc)
+	controller.SetJobManager(jobManager)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -29,31 +33,26 @@ func New(cfg config.Config, ragSvc *model.RAGService, jobManager *model.JobManag
 		response.Success(c, 200, gin.H{"message": "OK"})
 	})
 
-	userCtl := controller.NewUserController()
-	chunkCtl := controller.NewChunkController()
-	ragCtl := controller.NewRAGController(ragSvc)
-	jobCtl := controller.NewJobController(jobManager)
-
 	api := r.Group("/api/v1")
 	{
-		api.POST("/users", userCtl.Create)
-		api.GET("/users", userCtl.List)
-		api.GET("/users/:id", userCtl.Get)
-		api.PUT("/users/:id", userCtl.Update)
-		api.DELETE("/users/:id", userCtl.Delete)
+		api.POST("/users", controller.CreateUser)
+		api.GET("/users", controller.ListUsers)
+		api.GET("/users/:id", controller.GetUser)
+		api.PUT("/users/:id", controller.UpdateUser)
+		api.DELETE("/users/:id", controller.DeleteUser)
 
-		api.POST("/chunk", chunkCtl.Chunk)
-		api.POST("/chunk/compare", chunkCtl.Compare)
+		api.POST("/chunk", controller.Chunk)
+		api.POST("/chunk/compare", controller.CompareChunk)
 
-		api.POST("/rag/ingest", ragCtl.Ingest)
-		api.POST("/rag/search", ragCtl.Search)
+		api.POST("/rag/ingest", controller.IngestRAG)
+		api.POST("/rag/search", controller.SearchRAG)
 
-		api.GET("/jobs", jobCtl.List)
-		api.GET("/jobs/:name", jobCtl.Get)
-		api.POST("/jobs/:name/start", jobCtl.Start)
-		api.POST("/jobs/:name/stop", jobCtl.Stop)
-		api.POST("/jobs/:name/run", jobCtl.RunNow)
-		api.GET("/jobs/:name/logs", jobCtl.Logs)
+		api.GET("/jobs", controller.ListJobs)
+		api.GET("/jobs/:name", controller.GetJob)
+		api.POST("/jobs/:name/start", controller.StartJob)
+		api.POST("/jobs/:name/stop", controller.StopJob)
+		api.POST("/jobs/:name/run", controller.RunJobNow)
+		api.GET("/jobs/:name/logs", controller.ListJobLogs)
 	}
 
 	// 生产环境下托管前端静态文件（SPA fallback）

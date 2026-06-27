@@ -12,28 +12,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type UserController = model.UserController
-
-// NewUserController 创建用户控制器并绑定处理函数。
-func NewUserController() *UserController {
-	svc := service.NewUserService()
-	return &model.UserController{
-		CreateFunc: func(ctx *gin.Context) { create(ctx, svc) },
-		ListFunc:   func(ctx *gin.Context) { list(ctx, svc) },
-		GetFunc:    func(ctx *gin.Context) { get(ctx, svc) },
-		UpdateFunc: func(ctx *gin.Context) { update(ctx, svc) },
-		DeleteFunc: func(ctx *gin.Context) { deleteUser(ctx, svc) },
-	}
-}
-
-// create 处理创建用户的 HTTP 请求。
-func create(c *gin.Context, svc *service.UserService) {
+// CreateUser 处理创建用户的 HTTP 请求。
+func CreateUser(c *gin.Context) {
 	var req model.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
 		return
 	}
 
+	svc := service.NewUserService()
 	user, err := svc.Create(req.Name, req.Password, req.Quota, req.Remark)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "创建失败: "+err.Error())
@@ -42,8 +29,8 @@ func create(c *gin.Context, svc *service.UserService) {
 	response.Success(c, http.StatusCreated, user)
 }
 
-// list 处理查询用户列表的 HTTP 请求。
-func list(c *gin.Context, svc *service.UserService) {
+// ListUsers 处理查询用户列表的 HTTP 请求。
+func ListUsers(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 
@@ -69,6 +56,7 @@ func list(c *gin.Context, svc *service.UserService) {
 		}
 	}
 
+	svc := service.NewUserService()
 	result, err := svc.List(f)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "查询失败: "+err.Error())
@@ -77,14 +65,15 @@ func list(c *gin.Context, svc *service.UserService) {
 	response.Success(c, http.StatusOK, result)
 }
 
-// get 处理查询用户详情的 HTTP 请求。
-func get(c *gin.Context, svc *service.UserService) {
+// GetUser 处理查询用户详情的 HTTP 请求。
+func GetUser(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 
+	svc := service.NewUserService()
 	user, err := svc.GetByID(id, c.Query("name"))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "用户不存在")
@@ -93,8 +82,8 @@ func get(c *gin.Context, svc *service.UserService) {
 	response.Success(c, http.StatusOK, user)
 }
 
-// update 处理更新用户的 HTTP 请求。
-func update(c *gin.Context, svc *service.UserService) {
+// UpdateUser 处理更新用户的 HTTP 请求。
+func UpdateUser(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
@@ -125,6 +114,7 @@ func update(c *gin.Context, svc *service.UserService) {
 		return
 	}
 
+	svc := service.NewUserService()
 	user, err := svc.Update(id, updates)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -137,14 +127,15 @@ func update(c *gin.Context, svc *service.UserService) {
 	response.Success(c, http.StatusOK, user)
 }
 
-// deleteUser 处理删除用户的 HTTP 请求。
-func deleteUser(c *gin.Context, svc *service.UserService) {
+// DeleteUser 处理删除用户的 HTTP 请求。
+func DeleteUser(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "无效的ID")
 		return
 	}
 
+	svc := service.NewUserService()
 	if err := svc.Delete(id); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			response.Error(c, http.StatusNotFound, "用户不存在")

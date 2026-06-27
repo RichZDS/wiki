@@ -9,24 +9,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewRAGController 创建 RAG 控制器并注入工作流服务。
-func NewRAGController(svc *model.RAGService) *model.RAGController {
-	return &model.RAGController{
-		IngestFunc: func(c *gin.Context) { ingest(c, svc) },
-		SearchFunc: func(c *gin.Context) { search(c, svc) },
-	}
+// ragService 是 RAG 工作流服务的全局实例，由 main 启动时通过 SetRAGService 注入。
+var ragService *model.RAGService
+
+// SetRAGService 注入 RAG 工作流服务实例。
+func SetRAGService(svc *model.RAGService) {
+	ragService = svc
 }
 
-// ingest 处理文档入库请求：文本 → 切块 → 向量化 → Redis 存储。
-func ingest(c *gin.Context, svc *model.RAGService) {
+// IngestRAG 处理文档入库请求：文本 → 切块 → 向量化 → Redis 存储。
+func IngestRAG(c *gin.Context) {
 	var req model.RAGIngestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
 
-	//执行文档入库流程：文本 → 切块 → embedding → Redis 存储。
-	result, err := svc.Ingest(c.Request.Context(), req)
+	result, err := ragService.Ingest(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "ingest failed: "+err.Error())
 		return
@@ -35,15 +34,15 @@ func ingest(c *gin.Context, svc *model.RAGService) {
 	response.Success(c, http.StatusOK, result)
 }
 
-// search 处理语义检索请求：查询 → 向量化 → Redis 向量搜索。
-func search(c *gin.Context, svc *model.RAGService) {
+// SearchRAG 处理语义检索请求：查询 → 向量化 → Redis 向量搜索。
+func SearchRAG(c *gin.Context) {
 	var req model.RAGSearchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, http.StatusBadRequest, "invalid request: "+err.Error())
 		return
 	}
 
-	result, err := svc.Search(c.Request.Context(), req)
+	result, err := ragService.Search(c.Request.Context(), req)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "search failed: "+err.Error())
 		return

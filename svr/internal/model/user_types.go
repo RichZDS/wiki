@@ -1,7 +1,5 @@
 package model
 
-import "github.com/gin-gonic/gin"
-
 type CreateUserRequest struct {
 	Name     string `json:"name" binding:"required"`
 	Password string `json:"password" binding:"required"`
@@ -65,39 +63,6 @@ func (s *UserService) Update(id int64, updates map[string]any) (*User, error) {
 // Delete 软删除指定用户。
 func (s *UserService) Delete(id int64) error {
 	return s.DeleteFunc(id)
-}
-
-type UserController struct {
-	CreateFunc func(*gin.Context)
-	ListFunc   func(*gin.Context)
-	GetFunc    func(*gin.Context)
-	UpdateFunc func(*gin.Context)
-	DeleteFunc func(*gin.Context)
-}
-
-// Create 处理创建用户请求。
-func (c *UserController) Create(ctx *gin.Context) {
-	c.CreateFunc(ctx)
-}
-
-// List 处理用户列表请求。
-func (c *UserController) List(ctx *gin.Context) {
-	c.ListFunc(ctx)
-}
-
-// Get 处理用户详情请求。
-func (c *UserController) Get(ctx *gin.Context) {
-	c.GetFunc(ctx)
-}
-
-// Update 处理更新用户请求。
-func (c *UserController) Update(ctx *gin.Context) {
-	c.UpdateFunc(ctx)
-}
-
-// Delete 处理删除用户请求。
-func (c *UserController) Delete(ctx *gin.Context) {
-	c.DeleteFunc(ctx)
 }
 
 type ResponseBody struct {

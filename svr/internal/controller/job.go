@@ -11,28 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type JobController = model.JobController
+// jobManager 是任务管理器的全局实例，由 main 启动时通过 SetJobManager 注入。
+var jobManager *model.JobManager
 
-// NewJobController 创建任务控制器并注入任务服务。
-func NewJobController(manager *model.JobManager) *JobController {
-	svc := service.NewJobService(manager)
-	return &model.JobController{
-		ListFunc:   func(ctx *gin.Context) { listJobs(ctx, svc) },
-		GetFunc:    func(ctx *gin.Context) { getJob(ctx, svc) },
-		StartFunc:  func(ctx *gin.Context) { startJob(ctx, svc) },
-		StopFunc:   func(ctx *gin.Context) { stopJob(ctx, svc) },
-		RunNowFunc: func(ctx *gin.Context) { runJobNow(ctx, svc) },
-		LogsFunc:   func(ctx *gin.Context) { listJobLogs(ctx, svc) },
-	}
+// SetJobManager 注入任务管理器实例。
+func SetJobManager(mgr *model.JobManager) {
+	jobManager = mgr
 }
 
-// listJobs 处理任务列表请求。
-func listJobs(c *gin.Context, svc *service.JobService) {
+// ListJobs 处理任务列表请求。
+func ListJobs(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	response.Success(c, http.StatusOK, svc.List())
 }
 
-// getJob 处理任务详情请求。
-func getJob(c *gin.Context, svc *service.JobService) {
+// GetJob 处理任务详情请求。
+func GetJob(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	item, err := svc.Get(c.Param("name"))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, err.Error())
@@ -41,8 +36,9 @@ func getJob(c *gin.Context, svc *service.JobService) {
 	response.Success(c, http.StatusOK, item)
 }
 
-// startJob 处理启用任务请求。
-func startJob(c *gin.Context, svc *service.JobService) {
+// StartJob 处理启用任务请求。
+func StartJob(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	item, err := svc.Enable(c.Param("name"))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, err.Error())
@@ -51,8 +47,9 @@ func startJob(c *gin.Context, svc *service.JobService) {
 	response.Success(c, http.StatusOK, item)
 }
 
-// stopJob 处理停用任务请求。
-func stopJob(c *gin.Context, svc *service.JobService) {
+// StopJob 处理停用任务请求。
+func StopJob(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	item, err := svc.Disable(c.Param("name"))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, err.Error())
@@ -61,8 +58,9 @@ func stopJob(c *gin.Context, svc *service.JobService) {
 	response.Success(c, http.StatusOK, item)
 }
 
-// runJobNow 处理立即执行任务请求。
-func runJobNow(c *gin.Context, svc *service.JobService) {
+// RunJobNow 处理立即执行任务请求。
+func RunJobNow(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	item, err := svc.RunNow(c.Param("name"))
 	if err != nil {
 		response.Error(c, http.StatusConflict, err.Error())
@@ -71,8 +69,9 @@ func runJobNow(c *gin.Context, svc *service.JobService) {
 	response.Success(c, http.StatusOK, item)
 }
 
-// listJobLogs 处理任务日志列表请求。
-func listJobLogs(c *gin.Context, svc *service.JobService) {
+// ListJobLogs 处理任务日志列表请求。
+func ListJobLogs(c *gin.Context) {
+	svc := service.NewJobService(jobManager)
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
 	result, err := svc.ListLogs(model.JobLogFilter{
