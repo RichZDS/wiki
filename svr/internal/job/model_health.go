@@ -86,7 +86,7 @@ func DefaultModelCheckers() map[string]ModelChecker {
 		}
 
 		if m.ModelName == "embedding" {
-			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID)
+			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID, m.Provider)
 			continue
 		}
 		if m.ModelName == "minimax" {

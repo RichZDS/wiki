@@ -31,7 +31,7 @@ func NewEmbedderFromDB(ctx context.Context) (Embedder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query ai_model 'embedding': %w", err)
 	}
-	if aimodel.APIKey == "" {
+	if aimodel.APIKey == nil || *aimodel.APIKey == "" {
 		return nil, fmt.Errorf("api_key for 'embedding' model is not configured")
 	}
 	if aimodel.ModelId == "" {
@@ -43,7 +43,7 @@ func NewEmbedderFromDB(ctx context.Context) (Embedder, error) {
 		provider = ProviderGemini // 向后兼容：旧数据未设置 provider 时默认 Gemini
 	}
 
-	return NewEmbedderByProvider(ctx, provider, aimodel.APIKey, aimodel.ModelId)
+	return NewEmbedderByProvider(ctx, provider, *aimodel.APIKey, aimodel.ModelId)
 }
 
 // NewEmbedderByProvider 根据 provider 名称创建对应的 Embedder 实例。
