@@ -11,4 +11,6 @@ const (
 	RedisFieldAPIKey = "api_key"
 	// RedisFieldModelID AI 模型配置 Redis Hash 中 model_id 字段名。
 	RedisFieldModelID = "model_id"
+	// RedisFieldBaseURL AI 模型配置 Redis Hash 中 base_url 字段名。
+	RedisFieldBaseURL = "base_url"
 )

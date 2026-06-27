@@ -11,28 +11,29 @@ import (
 	"wiki/pkg/logger"
 )
 
-// GetCachedAIModelConfig 从 Redis 缓存中读取指定模型的 API Key 和 Model ID。
+// GetCachedAIModelConfig 从 Redis 缓存中读取指定模型的 API Key、Model ID 和 Base URL。
 // 返回值 hit 表示缓存命中。
-func GetCachedAIModelConfig(ctx context.Context, modelName string) (apiKey, modelID string, hit bool) {
+func GetCachedAIModelConfig(ctx context.Context, modelName string) (apiKey, modelID, baseURL string, hit bool) {
 	if database.RDB == nil {
-		return "", "", false
+		return "", "", "", false
 	}
 	key := consts.RedisKeyAIModelDeepSeek // 当前仅 DeepSeek 使用缓存，后续可扩展为 key 模板
 	fields, err := database.RDB.HGetAll(ctx, key).Result()
 	if err != nil || len(fields) == 0 {
-		return "", "", false
+		return "", "", "", false
 	}
 	apiKey = fields[consts.RedisFieldAPIKey]
 	modelID = fields[consts.RedisFieldModelID]
+	baseURL = fields[consts.RedisFieldBaseURL]
 	if apiKey != "" && modelID != "" {
 		logger.GetLogger().Printf("[REDIS] 模型 %s 配置缓存命中", modelName)
-		return apiKey, modelID, true
+		return apiKey, modelID, baseURL, true
 	}
-	return "", "", false
+	return "", "", "", false
 }
 
-// SetCachedAIModelConfig 将指定模型的 API Key 和 Model ID 写入 Redis 缓存。
-func SetCachedAIModelConfig(ctx context.Context, modelName, apiKey, modelID string) {
+// SetCachedAIModelConfig 将指定模型的 API Key、Model ID 和 Base URL 写入 Redis 缓存。
+func SetCachedAIModelConfig(ctx context.Context, modelName, apiKey, modelID, baseURL string) {
 	if database.RDB == nil {
 		return
 	}
@@ -40,6 +41,7 @@ func SetCachedAIModelConfig(ctx context.Context, modelName, apiKey, modelID stri
 	if err := database.RDB.HSet(ctx, key,
 		consts.RedisFieldAPIKey, apiKey,
 		consts.RedisFieldModelID, modelID,
+		consts.RedisFieldBaseURL, baseURL,
 	).Err(); err != nil {
 		logger.GetLogger().Printf("[REDIS] 模型 %s 缓存写入失败: %v", modelName, err)
 		return

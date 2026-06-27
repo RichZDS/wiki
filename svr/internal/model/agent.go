@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 
+	"github.com/cloudwego/eino-ext/components/model/claude"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	chatmodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -12,6 +13,10 @@ import (
 
 type OpenAIAgent struct {
 	Model *openai.ChatModel
+}
+
+type MinimaxAgent struct {
+	Model *claude.ChatModel
 }
 
 type DeepSeekConfig struct {

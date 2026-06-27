@@ -17,12 +17,17 @@ CREATE TABLE IF NOT EXISTS `user` (
 CREATE TABLE IF NOT EXISTS `ai_model` (
     `id`          BIGINT       NOT NULL COMMENT '主键（雪花算法生成）',
     `model_name`  VARCHAR(128) NOT NULL COMMENT '模型名称',
-    `model_id`    VARCHAR(128) NOT NULL DEFAULT '' COMMENT '模型 ID（API 调用用）',
-    `api_key`     VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'API 密钥，为空时回退环境变量',
-    `is_used`     TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否可用：0-不可用 1-可用',
-    `fail_reason` VARCHAR(512) NOT NULL DEFAULT '' COMMENT '不可用原因',
+    `model_id`    VARCHAR(255) NOT NULL COMMENT '模型 ID（API 调用用）',
+    `is_used`     TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用：1启用，0禁用',
+    `fail_reason` VARCHAR(255) DEFAULT NULL COMMENT '不可用原因',
+    `api_key`     VARCHAR(255) DEFAULT NULL COMMENT 'API 密钥，为空时回退环境变量',
+    `is_check`    TINYINT(1)   DEFAULT NULL COMMENT '是否通过检测',
+    `test_model`  VARCHAR(255) DEFAULT NULL COMMENT '测试模型',
+    `base_url`    VARCHAR(512) DEFAULT NULL COMMENT '模型接口基础地址',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_model_name` (`model_name`)
+    UNIQUE KEY `uk_model_name` (`model_name`),
+    KEY `idx_model_id` (`model_id`),
+    KEY `idx_used_check` (`is_used`,`is_check`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型状态表';
 
 -- 为 ai_model 表添加 provider 列（幂等迁移，已存在则跳过）

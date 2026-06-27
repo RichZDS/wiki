@@ -52,7 +52,7 @@ func NewDeepSeekAgentWithConfig(ctx context.Context, cfg *DeepSeekConfig) *DeepS
 	}
 
 	// 读取 DeepSeek 模型配置（优先 Redis 缓存，回退 MySQL 并写入缓存）
-	apiKey, modelID := loadDeepSeekConfig(ctx)
+	apiKey, modelID, baseURL := loadDeepSeekConfig(ctx)
 
 	// MaxSteps
 	maxSteps := cfg.MaxSteps
@@ -74,7 +74,7 @@ func NewDeepSeekAgentWithConfig(ctx context.Context, cfg *DeepSeekConfig) *DeepS
 
 	// 创建 ChatModel
 	m, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		BaseURL:     "https://api.deepseek.com",
+		BaseURL:     baseURL,
 		APIKey:      apiKey,
 		Model:       modelID,
 		MaxTokens:   utils.Ptr(maxTokens),
@@ -295,10 +295,13 @@ func getToolInfos(state *internalmodel.DeepSeekAgentState, ctx context.Context) 
 
 // loadDeepSeekConfig 从 Redis 缓存或 MySQL 数据库加载 DeepSeek 模型配置。
 // 优先读取 Redis 缓存，未命中时查询 MySQL 并将结果写入 Redis（1 小时过期）。
-func loadDeepSeekConfig(ctx context.Context) (apiKey, modelID string) {
+func loadDeepSeekConfig(ctx context.Context) (apiKey, modelID, baseURL string) {
 	// 1. 尝试从 Redis 读取
-	if key, id, hit := redis.GetCachedAIModelConfig(ctx, "deepseek"); hit {
-		return key, id
+	if key, id, u, hit := redis.GetCachedAIModelConfig(ctx, "deepseek"); hit {
+		if u == "" {
+			u = "https://api.deepseek.com"
+		}
+		return key, id, u
 	}
 
 	// 2. Redis 未命中或不可用，从 MySQL 读取
@@ -306,15 +309,21 @@ func loadDeepSeekConfig(ctx context.Context) (apiKey, modelID string) {
 	if err != nil {
 		log.Fatalf("failed to find ai_model 'deepseek': %v", err)
 	}
-	if aimodel.APIKey == "" {
+	apiKey = aimodel.APIKeyValue()
+	if apiKey == "" {
 		log.Fatal("api_key for deepseek is not configured")
 	}
-	if aimodel.ModelId == "" {
+	modelID = aimodel.ModelId
+	if modelID == "" {
 		log.Fatal("model_id for deepseek is not configured")
+	}
+	baseURL = aimodel.BaseURLValue()
+	if baseURL == "" {
+		baseURL = "https://api.deepseek.com"
 	}
 
 	// 3. 写入 Redis 缓存
-	redis.SetCachedAIModelConfig(ctx, "deepseek", aimodel.APIKey, aimodel.ModelId)
+	redis.SetCachedAIModelConfig(ctx, "deepseek", apiKey, modelID, baseURL)
 
-	return aimodel.APIKey, aimodel.ModelId
+	return apiKey, modelID, baseURL
 }

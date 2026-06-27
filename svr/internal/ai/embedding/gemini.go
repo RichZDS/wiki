@@ -30,8 +30,8 @@ type geminiBatchEmbedRequest struct {
 
 // geminiEmbedRequest 是单个文本的 embedding 请求。
 type geminiEmbedRequest struct {
-	Model   string               `json:"model"`
-	Content geminiEmbedContent   `json:"content"`
+	Model   string             `json:"model"`
+	Content geminiEmbedContent `json:"content"`
 }
 
 // geminiEmbedContent 是 embedding 请求中的内容部分。
@@ -81,14 +81,16 @@ func NewGeminiEmbedderFromDB(ctx context.Context) (*GeminiEmbedder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query ai_model 'embedding': %w", err)
 	}
-	if aimodel.APIKey == "" {
+	apiKey := aimodel.APIKeyValue()
+	if apiKey == "" {
 		return nil, fmt.Errorf("api_key for 'embedding' model is not configured")
 	}
-	if aimodel.ModelId == "" {
+	modelID := aimodel.ModelId
+	if modelID == "" {
 		return nil, fmt.Errorf("model_id for 'embedding' model is not configured")
 	}
 
-	return NewGeminiEmbedder(ctx, aimodel.APIKey, aimodel.ModelId)
+	return NewGeminiEmbedder(ctx, apiKey, modelID)
 }
 
 // EmbedStrings 实现 eino embedding.Embedder 接口，将文本序列转换为向量序列。

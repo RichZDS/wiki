@@ -17,6 +17,7 @@ import (
 	"wiki/pkg/logger"
 	"wiki/pkg/utils"
 
+	"github.com/cloudwego/eino-ext/components/model/claude"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
@@ -85,7 +86,11 @@ func DefaultModelCheckers() map[string]ModelChecker {
 		}
 
 		if m.ModelName == "embedding" {
-			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID, m.Provider)
+			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID)
+			continue
+		}
+		if m.ModelName == "minimax" {
+			checkers[m.ModelName] = newClaudeChecker(defaultProviders[m.ModelName], m.ID, modelID, m.BaseURLValue())
 			continue
 		}
 
@@ -100,23 +105,44 @@ func DefaultModelCheckers() map[string]ModelChecker {
 			markUnavailable(ctx, m.ID, consts.ModelFailReasonNotFound)
 			continue
 		}
-		checkers[m.ModelName] = newChatChecker(spec, m.ID, modelID)
+		checkers[m.ModelName] = newChatChecker(spec, m.ID, modelID, m.BaseURLValue())
 	}
 	return checkers
 }
 
 // newChatChecker 返回基于 eino BaseChatModel.Generate 的探测器。
-func newChatChecker(spec providerSpec, recordID int64, modelID string) ModelChecker {
+func newChatChecker(spec providerSpec, recordID int64, modelID, dbBaseURL string) ModelChecker {
 	factory := func(ctx context.Context) (einomodel.BaseChatModel, error) {
 		apiKey := resolveAPIKey(ctx, recordID, spec.envKey)
 		if apiKey == "" {
 			return nil, errors.New("API key is not configured")
 		}
 		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
-			BaseURL:     resolveBaseURL(spec),
+			BaseURL:     resolveBaseURL(spec, dbBaseURL),
 			APIKey:      apiKey,
 			Model:       modelID,
 			MaxTokens:   utils.Ptr(1),
+			Temperature: utils.Ptr(float32(0)),
+		})
+	}
+	return &model.CompatibleModelChecker{
+		CheckFunc: func(ctx context.Context) error { return probeChat(ctx, factory) },
+	}
+}
+
+// newClaudeChecker 返回基于 Anthropic Messages API 的探测器。
+func newClaudeChecker(spec providerSpec, recordID int64, modelID, dbBaseURL string) ModelChecker {
+	factory := func(ctx context.Context) (einomodel.BaseChatModel, error) {
+		apiKey := resolveAPIKey(ctx, recordID, spec.envKey)
+		if apiKey == "" {
+			return nil, errors.New("API key is not configured")
+		}
+		baseURL := resolveBaseURL(spec, dbBaseURL)
+		return claude.NewChatModel(ctx, &claude.Config{
+			BaseURL:     utils.Ptr(baseURL),
+			APIKey:      apiKey,
+			Model:       modelID,
+			MaxTokens:   1,
 			Temperature: utils.Ptr(float32(0)),
 		})
 	}
@@ -192,7 +218,7 @@ func runModelHealth(ctx context.Context, db *gorm.DB, checkers map[string]ModelC
 		if ok {
 			wantUsed, wantReason = 1, ""
 		}
-		if current.IsUsed == wantUsed && current.FailReason == wantReason {
+		if current.IsUsed == wantUsed && current.FailReasonValue() == wantReason {
 			continue
 		}
 
@@ -233,8 +259,11 @@ func resolveAPIKey(ctx context.Context, id int64, envKey string) string {
 	return strings.TrimSpace(os.Getenv(envKey))
 }
 
-// resolveBaseURL 返回 provider 的 Base URL，特殊 provider 支持环境变量覆盖。
-func resolveBaseURL(spec providerSpec) string {
+// resolveBaseURL 返回 provider 的 Base URL，优先使用数据库配置。
+func resolveBaseURL(spec providerSpec, dbBaseURL string) string {
+	if u := strings.TrimSpace(dbBaseURL); u != "" {
+		return u
+	}
 	if spec.envKey == "MINIMAX_API_KEY" {
 		if u := strings.TrimSpace(os.Getenv("MINIMAX_BASE_URL")); u != "" {
 			return u

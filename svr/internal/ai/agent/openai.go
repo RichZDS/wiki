@@ -21,7 +21,7 @@ func NewOpenAIAgent(ctx context.Context) *OpenAIAgent {
 		log.Fatalf("failed to find ai_model 'openai': %v", err)
 	}
 
-	apiKey := aimodel.APIKey
+	apiKey := aimodel.APIKeyValue()
 	if apiKey == "" {
 		log.Fatal("api_key for openai is not configured")
 	}
@@ -31,8 +31,13 @@ func NewOpenAIAgent(ctx context.Context) *OpenAIAgent {
 		log.Fatal("model_id for openai is not configured")
 	}
 
+	baseURL := aimodel.BaseURLValue()
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+
 	m, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
-		BaseURL:         "https://api.openai.com/v1",
+		BaseURL:         baseURL,
 		APIKey:          apiKey,
 		Model:           modelID,
 		MaxTokens:       utils.Ptr(2048),
