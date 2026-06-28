@@ -16,6 +16,19 @@ func GetAIModelByName(ctx context.Context, db *gorm.DB, modelName string) (*AIMo
 	return &aimodel, nil
 }
 
+// GetFirstAIModelByAbility 查询 ability 字段包含指定关键词且已启用的第一条模型记录。
+// abilityKeyword 使用 LIKE 模糊匹配（如 "embedding" 匹配 "embedding,text"）。
+func GetFirstAIModelByAbility(ctx context.Context, db *gorm.DB, abilityKeyword string) (*AIModel, error) {
+	var aimodel AIModel
+	if err := db.WithContext(ctx).
+		Where("is_used = ?", 1).
+		Where("ability LIKE ?", "%"+abilityKeyword+"%").
+		First(&aimodel).Error; err != nil {
+		return nil, fmt.Errorf("get ai_model by ability %q: %w", abilityKeyword, err)
+	}
+	return &aimodel, nil
+}
+
 // ListAllAIModelsInNeed 查询所有 AI 模型配置。
 func ListAllAIModelsInNeed(ctx context.Context, db *gorm.DB) ([]AIModel, error) {
 	var models []AIModel

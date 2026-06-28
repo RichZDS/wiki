@@ -65,8 +65,8 @@ func NewModelHealthTask(db *gorm.DB, checkers map[string]ModelChecker) *ModelHea
 
 // DefaultModelCheckers 从 ai_model 表读取所有需要监控的模型并构建探测器映射。
 // 当前支持：
-//   - "embedding"  -> 通过 embedding.Embedder.EmbedStrings 探测（Gemini）
-//   - "openai/deepseek/minimax" -> 通过 model.BaseChatModel.Generate 探测
+//   - ability 包含 "embedding" -> 通过 embedding.Embedder.EmbedStrings 探测
+//   - chat 模型（openai/deepseek/minimax 等）-> 通过 model.BaseChatModel.Generate 探测
 func DefaultModelCheckers() map[string]ModelChecker {
 	ctx := context.Background()
 	log := logger.GetLogger()
@@ -85,8 +85,8 @@ func DefaultModelCheckers() map[string]ModelChecker {
 			continue
 		}
 
-		if m.ModelName == "embedding" {
-			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID, m.Provider)
+		if strings.Contains(m.AbilityValue(), "embedding") {
+			checkers[m.ModelName] = newEmbeddingChecker(m.ID, modelID, m.Provider, m.BaseURLValue())
 			continue
 		}
 		if m.ModelName == "minimax" {
@@ -153,7 +153,7 @@ func newClaudeChecker(spec providerSpec, recordID int64, modelID, dbBaseURL stri
 
 // newEmbeddingChecker 返回基于 eino embedding.Embedder.EmbedStrings 的探测器。
 // provider 参数从 ai_model.provider 字段读取，空值时默认 "gemini"。
-func newEmbeddingChecker(recordID int64, modelID, provider string) ModelChecker {
+func newEmbeddingChecker(recordID int64, modelID, provider, baseURL string) ModelChecker {
 	if provider == "" {
 		provider = "gemini"
 	}
@@ -162,7 +162,7 @@ func newEmbeddingChecker(recordID int64, modelID, provider string) ModelChecker 
 		if apiKey == "" {
 			return nil, errors.New("API key is not configured")
 		}
-		return embedding.NewEmbedderByProvider(ctx, provider, apiKey, modelID)
+		return embedding.NewEmbedderByProvider(ctx, provider, apiKey, modelID, baseURL)
 	}
 	return &model.CompatibleModelChecker{
 		CheckFunc: func(ctx context.Context) error { return probeEmbed(ctx, factory) },

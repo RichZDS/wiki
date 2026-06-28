@@ -6,8 +6,10 @@ require (
 	github.com/cloudwego/eino v0.9.0-beta.1
 	github.com/cloudwego/eino-ext/components/embedding/ark v0.1.2
 	github.com/cloudwego/eino-ext/components/embedding/openai v0.0.0-20260612103359-5b10d0299532
+	github.com/cloudwego/eino-ext/components/indexer/redis v0.0.0-20260612103359-5b10d0299532
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.18
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/cloudwego/eino-ext/components/retriever/redis v0.0.0-20260612103359-5b10d0299532
 	github.com/gin-gonic/gin v1.12.0
 	github.com/redis/go-redis/v9 v9.19.0
 	golang.org/x/crypto v0.51.0
@@ -45,8 +47,6 @@ require (
 	github.com/bytedance/sonic/loader v0.5.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.7 // indirect
-	github.com/cloudwego/eino-ext/components/indexer/redis v0.0.0-20260612103359-5b10d0299532 // indirect
-	github.com/cloudwego/eino-ext/components/retriever/redis v0.0.0-20260612103359-5b10d0299532 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect

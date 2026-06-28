@@ -102,9 +102,7 @@ jobs:
 
       - name: 安装 Cosign
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v3
-        with:
-          cosign-release: v2.4.1
+        uses: sigstore/cosign-installer@v4
 
       - name: 写入镜像签名
         if: github.event_name != 'pull_request'

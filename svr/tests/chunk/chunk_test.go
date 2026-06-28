@@ -366,7 +366,12 @@ func TestHierarchicalChunkerChunkSizeRatio(t *testing.T) {
 	chunker := chunk.NewChunker(chunk.StrategyHierarchical)
 	cfg := chunk.ChunkConfig{ChunkSize: 150, ChunkOverlap: 0}
 
-	docs, err := chunker.Chunk(context.Background(), longMD, cfg)
+	// 构造不含 Markdown 标题的长段落，确保父块（chunkSize * 3 = 450）远大于子块（150）。
+	// 使用 longMD 时各段落均在 150 字符以内，父子块尺寸相同，无法体现比例差异。
+	longPara := strings.Repeat("The hierarchical chunking algorithm splits documents into parent and child layers for contextual retrieval. ", 40)
+	ratioContent := "# Introduction\n\n" + longPara
+
+	docs, err := chunker.Chunk(context.Background(), ratioContent, cfg)
 	tests.AssertNoErr(t, err, "HierarchicalChunker size ratio")
 
 	var maxParentLen, maxChildLen int

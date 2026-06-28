@@ -18,6 +18,7 @@ type OpenAIEmbedder = openai.Embedder
 // 环境变量：
 //   - OPENAI_API_KEY（必填）— API 密钥
 //   - OPENAI_EMBEDDING_MODEL（可选，默认 text-embedding-3-small）— 模型 ID
+//
 // 返回值：成功时返回 Embedder，失败时返回错误。
 func NewOpenAIEmbedder(ctx context.Context, apiKey string, modelID string, baseURL string, region string) (*OpenAIEmbedder, error) {
 	if apiKey == "" {

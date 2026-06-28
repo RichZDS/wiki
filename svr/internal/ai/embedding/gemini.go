@@ -73,21 +73,21 @@ func NewGeminiEmbedder(ctx context.Context, apiKey, modelID string) (*GeminiEmbe
 	}, nil
 }
 
-// NewGeminiEmbedderFromDB 从数据库 ai_model 表中读取 model_name="embedding" 的配置，
-// 并创建 Gemini Embedder 实例。
+// NewGeminiEmbedderFromDB 从数据库 ai_model 表中读取 ability 包含 "embedding" 且 is_used=1
+// 的第一条配置，并创建 Gemini Embedder 实例。
 // 返回的 Embedder 实现了 eino 的 embedding.Embedder 接口，可用于 Indexer 和 Retriever。
 func NewGeminiEmbedderFromDB(ctx context.Context) (*GeminiEmbedder, error) {
-	aimodel, err := model.GetAIModelByName(ctx, database.DB, "embedding")
+	aimodel, err := model.GetFirstAIModelByAbility(ctx, database.DB, "embedding")
 	if err != nil {
-		return nil, fmt.Errorf("query ai_model 'embedding': %w", err)
+		return nil, fmt.Errorf("query ai_model with ability 'embedding': %w", err)
 	}
 	apiKey := aimodel.APIKeyValue()
 	if apiKey == "" {
-		return nil, fmt.Errorf("api_key for 'embedding' model is not configured")
+		return nil, fmt.Errorf("api_key for embedding model %q is not configured", aimodel.ModelName)
 	}
 	modelID := aimodel.ModelId
 	if modelID == "" {
-		return nil, fmt.Errorf("model_id for 'embedding' model is not configured")
+		return nil, fmt.Errorf("model_id for embedding model %q is not configured", aimodel.ModelName)
 	}
 
 	return NewGeminiEmbedder(ctx, apiKey, modelID)
